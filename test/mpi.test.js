@@ -95,12 +95,15 @@ describe('matching', () => {
     await push('clinic-b', [patient('a1', bare)]);
     await push('smart', [patient('s1', typo)]);
     const target = bySource(await masters(), 'clinic-b');
+    const emptied = bySource(await masters(), 'smart').id; // this patient loses its only record
     const before = await detail(target.id);
     const res = await call(app.url, 'POST', `/patients/${target.id}/link`, {
       body: { source: 'smart', fhirId: 's1' },
       headers: { 'If-Match': before.headers.get('etag') },
     });
     assert.equal(res.status, 200);
+    const moved = await fetch(`${app.url}/patients/${emptied}`, { redirect: 'manual' }); // its id keeps working
+    assert.deepEqual([moved.status, moved.headers.get('location')], [301, `/patients/${target.id}`]);
     const list = await masters();
     assert.deepEqual(list.map((m) => [m.records, m.needsReview, m.possibleDuplicates]), [[2, false, 0]]);
     const after = await detail(target.id);

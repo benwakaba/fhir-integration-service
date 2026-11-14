@@ -47,8 +47,9 @@ function historyBundle(req, entries) {
 
 // --- golden (master) patients -------------------------------------------------
 
+// A merged-away patient is served as itself: inactive, with a replaced-by link.
 router.get('/golden/Patient/:id', async (req, res) => {
-  const { master } = await loadPatient(pool, req.params.id);
+  const { master } = await loadPatient(pool, req.params.id, { followMerged: false });
   if (notModified(req, master.version_id)) return res.status(304).set('ETag', etag(master.version_id)).end();
   sendResource(res, presentGolden(master), { versionId: master.version_id, lastModified: master.updated_at });
 });
@@ -65,7 +66,7 @@ router.get('/golden/Patient/:id/\\$everything', async (req, res) => {
 });
 
 router.get('/golden/Patient/:id/_history', async (req, res) => {
-  await loadPatient(pool, req.params.id);
+  await loadPatient(pool, req.params.id, { followMerged: false });
   const { rows } = await pool.query(
     'SELECT * FROM master_patient_versions WHERE master_id = $1 ORDER BY version_id DESC LIMIT 100',
     [req.params.id],

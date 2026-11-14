@@ -142,12 +142,14 @@ CREATE TABLE IF NOT EXISTS master_patients (
   conflicts JSONB NOT NULL DEFAULT '[]',    -- conflicts found by the last survivorship pass
   possible_duplicates JSONB NOT NULL DEFAULT '[]', -- masters a steward should compare: similar demographics, or a shared identifier that contradicts
   needs_review BOOLEAN NOT NULL DEFAULT false,
+  merged_into UUID REFERENCES master_patients(id), -- set once every source record has moved to another patient: this id is then a tombstone that points there
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Added after the first release; keeps existing databases migratable.
 ALTER TABLE master_patients ADD COLUMN IF NOT EXISTS possible_duplicates JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE master_patients ADD COLUMN IF NOT EXISTS merged_into UUID REFERENCES master_patients(id);
 
 CREATE TABLE IF NOT EXISTS master_patient_versions (
   master_id UUID NOT NULL REFERENCES master_patients(id) ON DELETE CASCADE,

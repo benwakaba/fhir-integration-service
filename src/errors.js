@@ -3,13 +3,14 @@
 // the developer API answers { error: message }.
 
 export class HttpError extends Error {
-  constructor(status, message, { code = 'processing', issues, headers } = {}) {
+  constructor(status, message, { code = 'processing', issues, headers, redirect } = {}) {
     super(message);
     this.name = 'HttpError';
     this.status = status;
     this.code = code; // OperationOutcome.issue.code (http://hl7.org/fhir/issue-type)
     this.issues = issues; // optional validation issues to include in the OperationOutcome
     this.headers = headers;
+    this.redirect = redirect; // { from, to }: send the client to the same URL with this id swapped
   }
 }
 
@@ -17,6 +18,9 @@ export const badRequest = (message) => new HttpError(400, message, { code: 'inva
 export const notFound = (message) => new HttpError(404, message, { code: 'not-found' });
 export const gone = (message) => new HttpError(410, message, { code: 'deleted' });
 export const conflict = (message) => new HttpError(409, message, { code: 'conflict' });
+
+/** A merged-away patient id: reads are sent to the patient it was merged into. */
+export const movedPermanently = (message, from, to) => new HttpError(301, message, { redirect: { from, to } });
 
 /** If-Match named a version that is no longer current. */
 export const preconditionFailed = (message) => new HttpError(412, message, { code: 'conflict' });

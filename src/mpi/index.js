@@ -3,8 +3,9 @@
 // All functions run inside the caller's transaction.
 
 import { config } from '../config.js';
-import { notFound, preconditionFailed, badRequest, unprocessable } from '../errors.js';
+import { badRequest, conflict, notFound, preconditionFailed, unprocessable } from '../errors.js';
 import { canonicalJson } from '../fhir/canonical.js';
+import { resolveMerged } from '../query/linked.js';
 import { structuralIssues } from '../validation/index.js';
 import { hasErrors } from '../validation/issues.js';
 import {
@@ -16,6 +17,7 @@ import {
   sharedIdentifiers,
   trustedIdentifiers,
 } from './match.js';
+import { loadGroupOf, parseGroupEtag, planConfirm } from './groups.js';
 import { survive } from './survivorship.js';
 
 // Link decisions are serialized: two sources delivering the same new person at
@@ -23,6 +25,7 @@ import { survive } from './survivorship.js';
 const MPI_LOCK = 72_401;
 
 const linkUrl = (record) => `${config.publicBaseUrl}/fhir/${record.sourceId}/Patient/${record.fhirId}`;
+const goldenUrl = (id) => `${config.publicBaseUrl}/fhir/golden/Patient/${id}`;
 
 /** Called after a source Patient version is stored. */
 export async function onPatientChanged(client, row) {
@@ -184,11 +187,20 @@ export async function recomputeGolden(client, masterId, reason, { always = false
      WHERE pl.master_id = $1 AND NOT r.deleted`,
     [masterId],
   );
-  const survived = survive(
-    records.map((r) => ({ sourceId: r.source_id, fhirId: r.fhir_id, priority: r.priority, lastUpdated: r.last_updated, resource: r.resource })),
-    master.overrides,
-    { masterId, linkUrl },
-  );
+  // A patient whose every record moved elsewhere is a tombstone: inactive, and
+  // pointing at the patient that replaced it (FHIR's replaced-by link).
+  const survived =
+    !records.length && master.merged_into
+      ? {
+          golden: { resourceType: 'Patient', id: masterId, active: false, link: [{ other: { reference: goldenUrl(master.merged_into) }, type: 'replaced-by' }] },
+          conflicts: [],
+          needsReview: false,
+        }
+      : survive(
+          records.map((r) => ({ sourceId: r.source_id, fhirId: r.fhir_id, priority: r.priority, lastUpdated: r.last_updated, resource: r.resource })),
+          master.overrides,
+          { masterId, linkUrl },
+        );
   const { golden, conflicts } = survived;
   const needsReview = survived.needsReview || master.possible_duplicates.length > 0;
   if (
@@ -220,6 +232,7 @@ async function lockMaster(client, masterId, expectedVersion) {
   await client.query('SELECT pg_advisory_xact_lock($1)', [MPI_LOCK]);
   const { rows } = await client.query('SELECT * FROM master_patients WHERE id = $1 FOR UPDATE', [masterId]);
   if (!rows[0]) throw notFound(`Patient ${masterId} not found`);
+  if (rows[0].merged_into) throw conflict(`Patient ${masterId} was merged into ${await resolveMerged(client, masterId)}; act on that patient instead`);
   if (rows[0].version_id !== expectedVersion) {
     throw preconditionFailed(`Version conflict: If-Match was W/"${expectedVersion}" but patient ${masterId} is at W/"${rows[0].version_id}"`);
   }
@@ -271,8 +284,12 @@ export async function linkRecord(client, masterId, sourceId, fhirId, expectedVer
   await removePossibleDuplicate(client, masterId, link.master_id);
   await removePossibleDuplicate(client, link.master_id, masterId);
   const { rows } = await client.query('SELECT count(*)::int AS n FROM patient_links WHERE master_id = $1', [link.master_id]);
-  if (rows[0].n === 0) await moveOpenFlags(client, link.master_id, masterId);
-  await recomputeGolden(client, link.master_id, `${sourceId}/Patient/${fhirId} moved to ${masterId}`);
+  const emptied = rows[0].n === 0;
+  if (emptied) {
+    await moveOpenFlags(client, link.master_id, masterId);
+    await client.query('UPDATE master_patients SET merged_into = $2 WHERE id = $1', [link.master_id, masterId]);
+  }
+  await recomputeGolden(client, link.master_id, emptied ? `merged into ${masterId}` : `${sourceId}/Patient/${fhirId} moved to ${masterId}`, { always: emptied });
   return recomputeGolden(client, masterId, `linked ${sourceId}/Patient/${fhirId} manually`);
 }
 
@@ -287,6 +304,64 @@ async function moveOpenFlags(client, emptiedId, survivorId) {
     await recomputeGolden(client, dup.masterId, `possible duplicate now tracked on ${survivorId}`, { always: true });
   }
   await client.query(`UPDATE master_patients SET possible_duplicates = '[]' WHERE id = $1`, [emptiedId]);
+}
+
+/**
+ * A steward confirms that a group of look-alike patients is one person. `expectedToken`
+ * is the group's ETag from when they read it, so this only runs on that exact view:
+ * a member edited, added or removed since then makes it a 412.
+ *
+ * By default everyone in the group is merged; `patients` narrows it to the ones that
+ * are the same person (the rest stay flagged against the merged patient). The
+ * survivor keeps its id, by default the oldest, and the others become tombstones
+ * that redirect to it. Records move as manual links and remember where they came
+ * from (`matched_on.mergedFrom`), so `unlink` can still split one back out.
+ */
+export async function confirmGroup(client, memberId, expectedToken, { patients = null, survivor = null } = {}) {
+  await client.query('SELECT pg_advisory_xact_lock($1)', [MPI_LOCK]);
+  const group = await loadGroupOf(client, memberId);
+  if (!group) throw notFound(`Patient ${memberId} is not in a group of possible duplicates (it may have just been confirmed or dismissed)`);
+  if (parseGroupEtag(group.etag) !== expectedToken) {
+    throw preconditionFailed(`The group changed since it was read: If-Match was W/"${expectedToken}" but it is now ${group.etag}. Read it again before confirming.`);
+  }
+
+  const inGroup = new Set(group.members.map((m) => m.id));
+  const selected = patients === null ? [...inGroup] : [...new Set(patients)];
+  for (const id of selected) if (!inGroup.has(id)) throw badRequest(`Patient ${id} is not in this group`);
+  if (selected.length < 2) throw badRequest('Choose at least two patients to confirm as one person');
+  const survivorId = survivor ?? group.members.find((m) => selected.includes(m.id)).id; // members are oldest first
+  if (!selected.includes(survivorId)) throw badRequest(`The survivor ${survivorId} must be one of the confirmed patients`);
+
+  const plan = planConfirm(group.members, selected, survivorId);
+  await client.query('SELECT id FROM master_patients WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[...inGroup]]);
+
+  await client.query(
+    `UPDATE patient_links
+     SET matched_on = jsonb_build_object('mergedFrom', master_id::text), master_id = $1, method = 'manual', score = NULL, linked_at = now()
+     WHERE master_id = ANY($2::uuid[])`,
+    [survivorId, plan.mergedAway],
+  );
+  const setFlags = (id, flags) => client.query('UPDATE master_patients SET possible_duplicates = $2::jsonb WHERE id = $1', [id, JSON.stringify(flags)]);
+  await setFlags(survivorId, plan.survivorFlags);
+  for (const [id, flags] of plan.outsiderFlags) await setFlags(id, flags);
+  await client.query(
+    `UPDATE master_patients SET possible_duplicates = '[]', needs_review = false, merged_into = $2 WHERE id = ANY($1::uuid[])`,
+    [plan.mergedAway, survivorId],
+  );
+
+  const master = await recomputeGolden(client, survivorId, `confirmed ${selected.length} patients as one person`, { always: true });
+  for (const id of plan.mergedAway) await recomputeGolden(client, id, `merged into ${survivorId}`, { always: true });
+  for (const id of plan.outsiderFlags.keys()) await recomputeGolden(client, id, `possible duplicates now tracked on ${survivorId}`, { always: true });
+
+  const { rows } = await client.query('SELECT count(*)::int AS n FROM patient_links WHERE master_id = $1', [survivorId]);
+  return {
+    survivor: survivorId,
+    master,
+    mergedAway: plan.mergedAway,
+    records: rows[0].n,
+    // Pinned values on a merged-away patient are not carried over; they stay in its history.
+    overridesDropped: group.members.filter((m) => plan.mergedAway.includes(m.id) && Object.keys(m.overrides ?? {}).length).map((m) => m.id),
+  };
 }
 
 /**

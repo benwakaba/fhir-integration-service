@@ -1,10 +1,29 @@
-import { notFound } from '../errors.js';
+import { movedPermanently, notFound } from '../errors.js';
 
-/** The golden patient and the source patients linked to it. */
-export async function loadPatient(db, masterId) {
+/** The patient a merged-away id ended up in, following the chain if that one was merged too. */
+export async function resolveMerged(db, masterId) {
+  let id = masterId;
+  for (let hops = 0; hops < 25; hops++) {
+    const { rows } = await db.query('SELECT merged_into FROM master_patients WHERE id = $1', [id]);
+    if (!rows[0]?.merged_into) return id;
+    id = rows[0].merged_into;
+  }
+  throw new Error(`Merge chain from ${masterId} does not end`);
+}
+
+/**
+ * The golden patient and the source patients linked to it. A merged-away id sends
+ * the caller to the patient it became (301), so ids applications stored keep
+ * working; pass followMerged: false to read the merged-away record itself.
+ */
+export async function loadPatient(db, masterId, { followMerged = true } = {}) {
   if (!/^[0-9a-f-]{36}$/i.test(masterId)) throw notFound(`Patient ${masterId} not found`);
   const { rows } = await db.query('SELECT * FROM master_patients WHERE id = $1', [masterId]);
   if (!rows[0]) throw notFound(`Patient ${masterId} not found`);
+  if (followMerged && rows[0].merged_into) {
+    const survivor = await resolveMerged(db, masterId);
+    throw movedPermanently(`Patient ${masterId} was merged into ${survivor}`, masterId, survivor);
+  }
   const { rows: links } = await db.query(
     `SELECT r.id AS resource_id, r.source_id, r.fhir_id, r.version_id, r.last_updated, r.deleted, pl.method, pl.score, pl.linked_at
      FROM patient_links pl JOIN resources r ON r.id = pl.resource_id

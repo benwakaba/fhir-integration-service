@@ -6,6 +6,7 @@ const log = createLogger('http');
 // FHIR routes answer errors with an OperationOutcome; the developer API with { error }.
 // eslint-disable-next-line no-unused-vars
 export function errorHandler(err, req, res, next) {
+  if (err.redirect) return res.redirect(err.status, req.originalUrl.replace(err.redirect.from, err.redirect.to));
   const parseError = err.type === 'entity.parse.failed';
   const status = parseError ? 400 : (err.status ?? 500);
   const message = parseError ? 'Request body is not valid JSON' : status >= 500 ? 'Internal server error' : err.message;

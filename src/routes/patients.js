@@ -6,7 +6,8 @@ import { Router } from 'express';
 import pool, { withTransaction } from '../db/pool.js';
 import { badRequest, notFound, preconditionRequired } from '../errors.js';
 import { etag, parseEtag, presentGolden } from '../fhir/present.js';
-import { dismissPossibleDuplicates, linkRecord, setOverrides, unlinkRecord } from '../mpi/index.js';
+import { describeGroup, loadGroupOf, loadGroups, parseGroupEtag } from '../mpi/groups.js';
+import { confirmGroup, dismissPossibleDuplicates, linkRecord, setOverrides, unlinkRecord } from '../mpi/index.js';
 import { everything } from '../mpi/everything.js';
 import { findConditions } from '../query/conditions.js';
 import { loadPatient, patientSummary } from '../query/linked.js';
@@ -53,6 +54,45 @@ router.get('/', async (req, res) => {
       needsReview: m.needs_review,
       possibleDuplicates: m.possible_duplicates,
     })),
+  });
+});
+
+// Look-alikes come in groups, and a steward decides about people, not pairs. A group's
+// ETag covers every member's version, so a confirm only works on the view you read.
+// These routes come before /:id so "duplicate-groups" is not read as a patient id.
+router.get('/duplicate-groups', async (req, res) => {
+  const limit = clampInt(req.query.limit, 50, 1, 500);
+  const offset = clampInt(req.query.offset, 0, 0, Number.MAX_SAFE_INTEGER);
+  const groups = await loadGroups(pool, { source: req.query.source ? String(req.query.source) : null });
+  res.json({ total: groups.length, groups: groups.slice(offset, offset + limit).map(describeGroup) });
+});
+
+// `id` may be any member of the group.
+router.get('/duplicate-groups/:id', async (req, res) => {
+  const group = await loadGroupOf(pool, req.params.id);
+  if (!group) throw notFound(`Patient ${req.params.id} is not in a group of possible duplicates`);
+  res.set('ETag', group.etag).json(describeGroup(group));
+});
+
+// Confirm that a group is one person. Body, all optional: { patients: [ids] } narrows
+// it to the ones that are the same person; { survivor: id } picks which id is kept.
+router.post('/duplicate-groups/:id/confirm', async (req, res) => {
+  const token = requireGroupIfMatch(req);
+  const { patients = null, survivor = null } = req.body ?? {};
+  if (patients !== null && (!Array.isArray(patients) || patients.some((p) => typeof p !== 'string'))) throw badRequest('patients must be an array of patient ids');
+  if (survivor !== null && typeof survivor !== 'string') throw badRequest('survivor must be a patient id');
+  const result = await withTransaction((client) => confirmGroup(client, req.params.id, token, { patients, survivor }));
+  const { master } = result;
+  res.set('ETag', etag(master.version_id)).json({
+    survivor: result.survivor,
+    merged: result.mergedAway,
+    records: result.records,
+    version: master.version_id,
+    needsReview: master.needs_review,
+    remainingCandidates: [...new Set(master.possible_duplicates.map((d) => d.masterId))],
+    overridesDropped: result.overridesDropped,
+    conflicts: master.conflicts,
+    golden: presentGolden(master),
   });
 });
 
@@ -140,8 +180,9 @@ router.get('/:id/\\$everything', async (req, res) => {
   res.type('application/fhir+json').json(bundle);
 });
 
+// History belongs to the id asked for, so a merged-away patient shows how it was merged.
 router.get('/:id/history', async (req, res) => {
-  await loadPatient(pool, req.params.id);
+  await loadPatient(pool, req.params.id, { followMerged: false });
   const { rows } = await pool.query(
     `SELECT version_id, reason, recorded_at, jsonb_array_length(conflicts) AS conflicts
      FROM master_patient_versions WHERE master_id = $1 ORDER BY version_id DESC`,
@@ -183,6 +224,14 @@ router.post('/:id/dismiss-duplicates', async (req, res) => {
   const master = await withTransaction((client) => dismissPossibleDuplicates(client, req.params.id, expected, other));
   res.set('ETag', etag(master.version_id)).json({ version: master.version_id, needsReview: master.needs_review, possibleDuplicates: master.possible_duplicates });
 });
+
+function requireGroupIfMatch(req) {
+  const header = req.get('if-match');
+  if (header === undefined) throw preconditionRequired(`Confirming a group requires If-Match with the group's ETag (GET /patients/duplicate-groups/${req.params.id})`);
+  const token = parseGroupEtag(header);
+  if (token === null) throw badRequest(`If-Match '${header}' is not a group ETag like W/"g-0123456789abcdef"`);
+  return token;
+}
 
 function requireIfMatch(req) {
   const header = req.get('if-match');

@@ -4,6 +4,7 @@ import { contentHash } from '../src/fhir/canonical.js';
 import { clinicalTime, dateRange } from '../src/fhir/dates.js';
 import { parseEtag } from '../src/fhir/present.js';
 import { patientRefOf } from '../src/fhir/references.js';
+import { describeGroup, groupEtag, groupMasters, parseGroupEtag, planConfirm } from '../src/mpi/groups.js';
 import { demographicScore, differingIdentifiers, identifierPatterns, jaroWinkler, sharedIdentifiers, trustedIdentifiers } from '../src/mpi/match.js';
 import { survive } from '../src/mpi/survivorship.js';
 import { conceptsFor, exclusionsFor, getConcept } from '../src/terminology/concepts.js';
@@ -198,5 +199,78 @@ describe('survivorship', () => {
     const a = rec('a', 20, '2021-01-01', { identifier: [{ system: 'http://hl7.org/fhir/sid/us-ssn', value: '999-12-3456' }] });
     const b = rec('b', 10, '2025-01-01', { identifier: [{ system: 'http://hl7.org/fhir/sid/us-ssn', value: '999-65-4321' }] });
     assert.ok(survive([a, b]).conflicts.some((c) => c.element === 'identifier:ssn' && c.severity === 'high'));
+  });
+});
+
+describe('duplicate groups', () => {
+  // A golden patient as the group queries load it: flags are { masterId, reason, score }.
+  const flag = (masterId, score = 0.9) => ({ masterId, score, reason: `name and birthDate agree (score ${score}) with no identifier in common` });
+  const master = (id, day, flagged = [], extra = {}) => ({
+    id,
+    version_id: 1,
+    created_at: new Date(`2026-01-${String(day).padStart(2, '0')}T00:00:00Z`),
+    golden: { name: [{ given: ['Ana'], family: 'Rivera' }], birthDate: '1970-05-17', gender: 'female' },
+    overrides: {},
+    possible_duplicates: flagged.map((f) => (typeof f === 'string' ? flag(f) : f)),
+    sources: ['smart'],
+    records: 1,
+    ...extra,
+  });
+
+  test('a group is a connected set of flags, oldest member first; chains are not complete', () => {
+    const groups = groupMasters([
+      master('c', 3, ['b']),
+      master('a', 1, ['b']),
+      master('b', 2, ['a', 'c']), // a - b - c: a chain, a and c never flagged
+      master('e', 5, ['d']),
+      master('d', 4, ['e']),
+      master('f', 6), // no flags: not a group
+      master('g', 7, ['nobody']), // flagged against a patient that is not there: ignored
+    ]);
+    assert.deepEqual(groups.map((g) => g.members.map((m) => m.id)), [['a', 'b', 'c'], ['d', 'e']]);
+    assert.deepEqual(groups.map((g) => [g.survivor, g.complete, g.records]), [['a', false, 3], ['d', true, 2]]);
+  });
+
+  test('the group ETag moves when any member changes and ignores order', () => {
+    const [a, b] = [master('a', 1), master('b', 2)];
+    assert.equal(groupEtag([a, b]), groupEtag([b, a]));
+    assert.notEqual(groupEtag([a, b]), groupEtag([{ ...a, version_id: 2 }, b]));
+    assert.notEqual(groupEtag([a, b]), groupEtag([a, b, master('c', 3)]));
+    const token = parseGroupEtag(groupEtag([a, b]));
+    assert.match(token, /^g-[0-9a-f]{16}$/);
+    assert.equal(parseGroupEtag(`"${token}"`), token);
+    assert.equal(parseGroupEtag('W/"3"'), null); // a patient ETag is not a group ETag
+    assert.equal(parseGroupEtag(undefined), null);
+  });
+
+  test('a group is described once per pair, with the weakest score', () => {
+    const [group] = groupMasters([master('a', 1, [flag('b', 0.85)]), master('b', 2, [flag('a', 0.85)])]);
+    const described = describeGroup(group);
+    assert.deepEqual([described.size, described.minScore, described.reasons], [2, 0.85, [{ reason: 'name and birthDate agree (score N) with no identifier in common', pairs: 1 }]]);
+    assert.deepEqual(described.patients.map((p) => [p.id, p.name]), [['a', 'Ana Rivera'], ['b', 'Ana Rivera']]);
+  });
+
+  test('confirming a whole group settles every flag and merges all but the survivor', () => {
+    const members = [master('a', 1, ['b', 'c']), master('b', 2, ['a', 'c']), master('c', 3, ['a', 'b'])];
+    const plan = planConfirm(members, ['a', 'b', 'c'], 'a');
+    assert.deepEqual(plan.mergedAway, ['b', 'c']);
+    assert.deepEqual([plan.survivorFlags, [...plan.outsiderFlags]], [[], []]);
+  });
+
+  test('confirming a subset moves the leftover flags to the survivor, on both sides', () => {
+    // d resembles a and c but not b; a, b and c are confirmed as one person.
+    const members = [master('a', 1, ['b', 'c', 'd']), master('b', 2, ['a', 'c']), master('c', 3, ['a', 'b', 'd']), master('d', 4, ['a', 'c'])];
+    const plan = planConfirm(members, ['a', 'b', 'c'], 'a');
+    assert.deepEqual(plan.mergedAway, ['b', 'c']);
+    assert.deepEqual(plan.survivorFlags.map((f) => f.masterId), ['d']);
+    assert.deepEqual([...plan.outsiderFlags.keys()], ['d']);
+    assert.deepEqual(plan.outsiderFlags.get('d').map((f) => f.masterId), ['a']); // two flags became one
+  });
+
+  test('an outsider flagged only from the confirmed side is flagged back', () => {
+    const members = [master('a', 1, ['b', 'd']), master('b', 2, ['a']), master('d', 4)]; // d does not list a
+    const plan = planConfirm(members, ['a', 'b'], 'a');
+    assert.deepEqual(plan.outsiderFlags.get('d').map((f) => f.masterId), ['a']);
+    assert.deepEqual(plan.survivorFlags.map((f) => f.masterId), ['d']);
   });
 });
