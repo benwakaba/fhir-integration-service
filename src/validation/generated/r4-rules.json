@@ -1,0 +1,1467 @@
+{
+ "generatedFrom": [
+  "hl7.fhir.r4.core#4.0.1",
+  "hl7.fhir.us.core#6.1.0"
+ ],
+ "resources": {
+  "Patient": {
+   "requiredPrimitives": [
+    {
+     "path": "link.type"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "Observation": {
+   "requiredPrimitives": [
+    {
+     "path": "status"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "Condition": {
+   "requiredPrimitives": [],
+   "requiredBindings": [
+    {
+     "path": "clinicalStatus",
+     "type": "CodeableConcept",
+     "valueSet": "http://hl7.org/fhir/ValueSet/condition-clinical",
+     "codes": [
+      "http://terminology.hl7.org/CodeSystem/condition-clinical|active",
+      "http://terminology.hl7.org/CodeSystem/condition-clinical|inactive",
+      "http://terminology.hl7.org/CodeSystem/condition-clinical|recurrence",
+      "http://terminology.hl7.org/CodeSystem/condition-clinical|relapse",
+      "http://terminology.hl7.org/CodeSystem/condition-clinical|remission",
+      "http://terminology.hl7.org/CodeSystem/condition-clinical|resolved"
+     ]
+    },
+    {
+     "path": "verificationStatus",
+     "type": "CodeableConcept",
+     "valueSet": "http://hl7.org/fhir/ValueSet/condition-ver-status",
+     "codes": [
+      "http://terminology.hl7.org/CodeSystem/condition-ver-status|confirmed",
+      "http://terminology.hl7.org/CodeSystem/condition-ver-status|differential",
+      "http://terminology.hl7.org/CodeSystem/condition-ver-status|entered-in-error",
+      "http://terminology.hl7.org/CodeSystem/condition-ver-status|provisional",
+      "http://terminology.hl7.org/CodeSystem/condition-ver-status|refuted",
+      "http://terminology.hl7.org/CodeSystem/condition-ver-status|unconfirmed"
+     ]
+    }
+   ]
+  },
+  "Encounter": {
+   "requiredPrimitives": [
+    {
+     "path": "status"
+    },
+    {
+     "path": "statusHistory.status"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "AllergyIntolerance": {
+   "requiredPrimitives": [],
+   "requiredBindings": [
+    {
+     "path": "clinicalStatus",
+     "type": "CodeableConcept",
+     "valueSet": "http://hl7.org/fhir/ValueSet/allergyintolerance-clinical",
+     "codes": [
+      "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical|active",
+      "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical|inactive",
+      "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical|resolved"
+     ]
+    },
+    {
+     "path": "verificationStatus",
+     "type": "CodeableConcept",
+     "valueSet": "http://hl7.org/fhir/ValueSet/allergyintolerance-verification",
+     "codes": [
+      "http://terminology.hl7.org/CodeSystem/allergyintolerance-verification|confirmed",
+      "http://terminology.hl7.org/CodeSystem/allergyintolerance-verification|entered-in-error",
+      "http://terminology.hl7.org/CodeSystem/allergyintolerance-verification|refuted",
+      "http://terminology.hl7.org/CodeSystem/allergyintolerance-verification|unconfirmed"
+     ]
+    }
+   ]
+  },
+  "Immunization": {
+   "requiredPrimitives": [
+    {
+     "path": "status"
+    },
+    {
+     "path": "occurrence[x]",
+     "variants": [
+      "occurrenceDateTime",
+      "occurrenceString"
+     ]
+    },
+    {
+     "path": "protocolApplied.doseNumber[x]",
+     "variants": [
+      "protocolApplied.doseNumberPositiveInt",
+      "protocolApplied.doseNumberString"
+     ]
+    }
+   ],
+   "requiredBindings": []
+  },
+  "MedicationRequest": {
+   "requiredPrimitives": [
+    {
+     "path": "status"
+    },
+    {
+     "path": "intent"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "Procedure": {
+   "requiredPrimitives": [
+    {
+     "path": "status"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "DiagnosticReport": {
+   "requiredPrimitives": [
+    {
+     "path": "status"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "Practitioner": {
+   "requiredPrimitives": [],
+   "requiredBindings": []
+  },
+  "Organization": {
+   "requiredPrimitives": [],
+   "requiredBindings": []
+  },
+  "Location": {
+   "requiredPrimitives": [
+    {
+     "path": "position.longitude"
+    },
+    {
+     "path": "position.latitude"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "Bundle": {
+   "requiredPrimitives": [
+    {
+     "path": "type"
+    },
+    {
+     "path": "link.relation"
+    },
+    {
+     "path": "link.url"
+    },
+    {
+     "path": "entry.request.method"
+    },
+    {
+     "path": "entry.request.url"
+    },
+    {
+     "path": "entry.response.status"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "Provenance": {
+   "requiredPrimitives": [
+    {
+     "path": "recorded"
+    },
+    {
+     "path": "entity.role"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "DocumentReference": {
+   "requiredPrimitives": [
+    {
+     "path": "status"
+    },
+    {
+     "path": "relatesTo.code"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "CarePlan": {
+   "requiredPrimitives": [
+    {
+     "path": "status"
+    },
+    {
+     "path": "intent"
+    },
+    {
+     "path": "activity.detail.status"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "Goal": {
+   "requiredPrimitives": [
+    {
+     "path": "lifecycleStatus"
+    }
+   ],
+   "requiredBindings": []
+  },
+  "Device": {
+   "requiredPrimitives": [
+    {
+     "path": "deviceName.name"
+    },
+    {
+     "path": "deviceName.type"
+    },
+    {
+     "path": "version.value"
+    }
+   ],
+   "requiredBindings": []
+  }
+ },
+ "knownExtensions": [
+  "http://fhir-registry.smarthealthit.org/StructureDefinition/capabilities",
+  "http://fhir-registry.smarthealthit.org/StructureDefinition/oauth-uris",
+  "http://hl7.org/fhir/StructureDefinition/11179-objectClass",
+  "http://hl7.org/fhir/StructureDefinition/11179-objectClassProperty",
+  "http://hl7.org/fhir/StructureDefinition/11179-permitted-value-conceptmap",
+  "http://hl7.org/fhir/StructureDefinition/11179-permitted-value-valueset",
+  "http://hl7.org/fhir/StructureDefinition/DiagnosticReport-geneticsAnalysis",
+  "http://hl7.org/fhir/StructureDefinition/DiagnosticReport-geneticsAssessedCondition",
+  "http://hl7.org/fhir/StructureDefinition/DiagnosticReport-geneticsFamilyMemberHistory",
+  "http://hl7.org/fhir/StructureDefinition/DiagnosticReport-geneticsReferences",
+  "http://hl7.org/fhir/StructureDefinition/allergyintolerance-assertedDate",
+  "http://hl7.org/fhir/StructureDefinition/allergyintolerance-certainty",
+  "http://hl7.org/fhir/StructureDefinition/allergyintolerance-duration",
+  "http://hl7.org/fhir/StructureDefinition/allergyintolerance-reasonRefuted",
+  "http://hl7.org/fhir/StructureDefinition/allergyintolerance-resolutionAge",
+  "http://hl7.org/fhir/StructureDefinition/allergyintolerance-substanceExposureRisk",
+  "http://hl7.org/fhir/StructureDefinition/auditevent-Accession",
+  "http://hl7.org/fhir/StructureDefinition/auditevent-Anonymized",
+  "http://hl7.org/fhir/StructureDefinition/auditevent-Encrypted",
+  "http://hl7.org/fhir/StructureDefinition/auditevent-Instance",
+  "http://hl7.org/fhir/StructureDefinition/auditevent-MPPS",
+  "http://hl7.org/fhir/StructureDefinition/auditevent-NumberOfInstances",
+  "http://hl7.org/fhir/StructureDefinition/auditevent-ParticipantObjectContainsStudy",
+  "http://hl7.org/fhir/StructureDefinition/auditevent-SOPClass",
+  "http://hl7.org/fhir/StructureDefinition/bodySite",
+  "http://hl7.org/fhir/StructureDefinition/capabilitystatement-expectation",
+  "http://hl7.org/fhir/StructureDefinition/capabilitystatement-prohibited",
+  "http://hl7.org/fhir/StructureDefinition/capabilitystatement-search-parameter-combination",
+  "http://hl7.org/fhir/StructureDefinition/capabilitystatement-supported-system",
+  "http://hl7.org/fhir/StructureDefinition/capabilitystatement-websocket",
+  "http://hl7.org/fhir/StructureDefinition/careplan-activity-title",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-alternate",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-author",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-concept-comments",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-conceptOrder",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-effectiveDate",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-expirationDate",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-history",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-keyWord",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-label",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-map",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-otherName",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-replacedby",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-sourceReference",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-trusted-expansion",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-usage",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-warning",
+  "http://hl7.org/fhir/StructureDefinition/codesystem-workflowStatus",
+  "http://hl7.org/fhir/StructureDefinition/coding-sctdescid",
+  "http://hl7.org/fhir/StructureDefinition/communication-media",
+  "http://hl7.org/fhir/StructureDefinition/communicationrequest-initiatingLocation",
+  "http://hl7.org/fhir/StructureDefinition/composition-clinicaldocument-otherConfidentiality",
+  "http://hl7.org/fhir/StructureDefinition/composition-clinicaldocument-versionNumber",
+  "http://hl7.org/fhir/StructureDefinition/composition-section-subject",
+  "http://hl7.org/fhir/StructureDefinition/concept-bidirectional",
+  "http://hl7.org/fhir/StructureDefinition/condition-assertedDate",
+  "http://hl7.org/fhir/StructureDefinition/condition-dueTo",
+  "http://hl7.org/fhir/StructureDefinition/condition-occurredFollowing",
+  "http://hl7.org/fhir/StructureDefinition/condition-outcome",
+  "http://hl7.org/fhir/StructureDefinition/condition-related",
+  "http://hl7.org/fhir/StructureDefinition/condition-ruledOut",
+  "http://hl7.org/fhir/StructureDefinition/consent-NotificationEndpoint",
+  "http://hl7.org/fhir/StructureDefinition/consent-Transcriber",
+  "http://hl7.org/fhir/StructureDefinition/consent-Witness",
+  "http://hl7.org/fhir/StructureDefinition/consent-location",
+  "http://hl7.org/fhir/StructureDefinition/contactpoint-area",
+  "http://hl7.org/fhir/StructureDefinition/contactpoint-country",
+  "http://hl7.org/fhir/StructureDefinition/contactpoint-extension",
+  "http://hl7.org/fhir/StructureDefinition/contactpoint-local",
+  "http://hl7.org/fhir/StructureDefinition/cqf-calculatedValue",
+  "http://hl7.org/fhir/StructureDefinition/cqf-cdsHooksEndpoint",
+  "http://hl7.org/fhir/StructureDefinition/cqf-citation",
+  "http://hl7.org/fhir/StructureDefinition/cqf-encounterClass",
+  "http://hl7.org/fhir/StructureDefinition/cqf-encounterType",
+  "http://hl7.org/fhir/StructureDefinition/cqf-expression",
+  "http://hl7.org/fhir/StructureDefinition/cqf-initialValue",
+  "http://hl7.org/fhir/StructureDefinition/cqf-initiatingOrganization",
+  "http://hl7.org/fhir/StructureDefinition/cqf-initiatingPerson",
+  "http://hl7.org/fhir/StructureDefinition/cqf-library",
+  "http://hl7.org/fhir/StructureDefinition/cqf-measureInfo",
+  "http://hl7.org/fhir/StructureDefinition/cqf-qualityOfEvidence",
+  "http://hl7.org/fhir/StructureDefinition/cqf-receivingOrganization",
+  "http://hl7.org/fhir/StructureDefinition/cqf-receivingPerson",
+  "http://hl7.org/fhir/StructureDefinition/cqf-recipientLanguage",
+  "http://hl7.org/fhir/StructureDefinition/cqf-recipientType",
+  "http://hl7.org/fhir/StructureDefinition/cqf-relativeDateTime",
+  "http://hl7.org/fhir/StructureDefinition/cqf-strengthOfRecommendation",
+  "http://hl7.org/fhir/StructureDefinition/cqf-systemUserLanguage",
+  "http://hl7.org/fhir/StructureDefinition/cqf-systemUserTaskContext",
+  "http://hl7.org/fhir/StructureDefinition/cqf-systemUserType",
+  "http://hl7.org/fhir/StructureDefinition/cqm-ValidityPeriod",
+  "http://hl7.org/fhir/StructureDefinition/data-absent-reason",
+  "http://hl7.org/fhir/StructureDefinition/designNote",
+  "http://hl7.org/fhir/StructureDefinition/device-implantStatus",
+  "http://hl7.org/fhir/StructureDefinition/devicerequest-patientInstruction",
+  "http://hl7.org/fhir/StructureDefinition/diagnosticReport-addendumOf",
+  "http://hl7.org/fhir/StructureDefinition/diagnosticReport-extends",
+  "http://hl7.org/fhir/StructureDefinition/diagnosticReport-locationPerformed",
+  "http://hl7.org/fhir/StructureDefinition/diagnosticReport-replaces",
+  "http://hl7.org/fhir/StructureDefinition/diagnosticReport-risk",
+  "http://hl7.org/fhir/StructureDefinition/diagnosticReport-summaryOf",
+  "http://hl7.org/fhir/StructureDefinition/display",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-allowedUnits",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-bestpractice",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-bestpractice-explanation",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-bindingName",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-equivalence",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-identifier",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-inheritedExtensibleValueSet",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-isCommonBinding",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-maxValueSet",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-minValueSet",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-namespace",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-profile-element",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-question",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-selector",
+  "http://hl7.org/fhir/StructureDefinition/elementdefinition-translatable",
+  "http://hl7.org/fhir/StructureDefinition/encounter-associatedEncounter",
+  "http://hl7.org/fhir/StructureDefinition/encounter-modeOfArrival",
+  "http://hl7.org/fhir/StructureDefinition/encounter-reasonCancelled",
+  "http://hl7.org/fhir/StructureDefinition/entryFormat",
+  "http://hl7.org/fhir/StructureDefinition/event-basedOn",
+  "http://hl7.org/fhir/StructureDefinition/event-eventHistory",
+  "http://hl7.org/fhir/StructureDefinition/event-location",
+  "http://hl7.org/fhir/StructureDefinition/event-partOf",
+  "http://hl7.org/fhir/StructureDefinition/event-performerFunction",
+  "http://hl7.org/fhir/StructureDefinition/event-statusReason",
+  "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-observation",
+  "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-parent",
+  "http://hl7.org/fhir/StructureDefinition/family-member-history-genetics-sibling",
+  "http://hl7.org/fhir/StructureDefinition/familymemberhistory-abatement",
+  "http://hl7.org/fhir/StructureDefinition/familymemberhistory-patient-record",
+  "http://hl7.org/fhir/StructureDefinition/familymemberhistory-severity",
+  "http://hl7.org/fhir/StructureDefinition/familymemberhistory-type",
+  "http://hl7.org/fhir/StructureDefinition/flag-detail",
+  "http://hl7.org/fhir/StructureDefinition/flag-priority",
+  "http://hl7.org/fhir/StructureDefinition/geolocation",
+  "http://hl7.org/fhir/StructureDefinition/goal-acceptance",
+  "http://hl7.org/fhir/StructureDefinition/goal-reasonRejected",
+  "http://hl7.org/fhir/StructureDefinition/goal-relationship",
+  "http://hl7.org/fhir/StructureDefinition/hla-genotyping-results-allele-database",
+  "http://hl7.org/fhir/StructureDefinition/hla-genotyping-results-glstring",
+  "http://hl7.org/fhir/StructureDefinition/hla-genotyping-results-haploid",
+  "http://hl7.org/fhir/StructureDefinition/hla-genotyping-results-method",
+  "http://hl7.org/fhir/StructureDefinition/http-response-header",
+  "http://hl7.org/fhir/StructureDefinition/humanname-assembly-order",
+  "http://hl7.org/fhir/StructureDefinition/humanname-fathers-family",
+  "http://hl7.org/fhir/StructureDefinition/humanname-mothers-family",
+  "http://hl7.org/fhir/StructureDefinition/humanname-own-name",
+  "http://hl7.org/fhir/StructureDefinition/humanname-own-prefix",
+  "http://hl7.org/fhir/StructureDefinition/humanname-partner-name",
+  "http://hl7.org/fhir/StructureDefinition/humanname-partner-prefix",
+  "http://hl7.org/fhir/StructureDefinition/identifier-validDate",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-AD-use",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-additionalLocator",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-buildingNumberSuffix",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-careOf",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-censusTract",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-delimiter",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-deliveryAddressLine",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-deliveryInstallationArea",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-deliveryInstallationQualifier",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-deliveryInstallationType",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-deliveryMode",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-deliveryModeIdentifier",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-direction",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-houseNumber",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-houseNumberNumeric",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-postBox",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-precinct",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-streetAddressLine",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-streetName",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-streetNameBase",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-streetNameType",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-unitID",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-ADXP-unitType",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-EN-qualifier",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-EN-representation",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-EN-use",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-PQ-translation",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-SC-coding",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-TEL-address",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-nullFlavor",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-preferred",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-uncertainty",
+  "http://hl7.org/fhir/StructureDefinition/iso21090-uncertaintyType",
+  "http://hl7.org/fhir/StructureDefinition/language",
+  "http://hl7.org/fhir/StructureDefinition/list-changeBase",
+  "http://hl7.org/fhir/StructureDefinition/location-boundary-geojson",
+  "http://hl7.org/fhir/StructureDefinition/location-distance",
+  "http://hl7.org/fhir/StructureDefinition/match-grade",
+  "http://hl7.org/fhir/StructureDefinition/maxDecimalPlaces",
+  "http://hl7.org/fhir/StructureDefinition/maxSize",
+  "http://hl7.org/fhir/StructureDefinition/maxValue",
+  "http://hl7.org/fhir/StructureDefinition/messageheader-response-request",
+  "http://hl7.org/fhir/StructureDefinition/mimeType",
+  "http://hl7.org/fhir/StructureDefinition/minLength",
+  "http://hl7.org/fhir/StructureDefinition/minValue",
+  "http://hl7.org/fhir/StructureDefinition/narrativeLink",
+  "http://hl7.org/fhir/StructureDefinition/nutritionorder-adaptiveFeedingDevice",
+  "http://hl7.org/fhir/StructureDefinition/observation-bodyPosition",
+  "http://hl7.org/fhir/StructureDefinition/observation-delta",
+  "http://hl7.org/fhir/StructureDefinition/observation-deviceCode",
+  "http://hl7.org/fhir/StructureDefinition/observation-focusCode",
+  "http://hl7.org/fhir/StructureDefinition/observation-gatewayDevice",
+  "http://hl7.org/fhir/StructureDefinition/observation-geneticsAllele",
+  "http://hl7.org/fhir/StructureDefinition/observation-geneticsAminoAcidChange",
+  "http://hl7.org/fhir/StructureDefinition/observation-geneticsAncestry",
+  "http://hl7.org/fhir/StructureDefinition/observation-geneticsCopyNumberEvent",
+  "http://hl7.org/fhir/StructureDefinition/observation-geneticsDNARegionName",
+  "http://hl7.org/fhir/StructureDefinition/observation-geneticsGene",
+  "http://hl7.org/fhir/StructureDefinition/observation-geneticsGenomicSourceClass",
+  "http://hl7.org/fhir/StructureDefinition/observation-geneticsInterpretation",
+  "http://hl7.org/fhir/StructureDefinition/observation-geneticsPhaseSet",
+  "http://hl7.org/fhir/StructureDefinition/observation-geneticsVariant",
+  "http://hl7.org/fhir/StructureDefinition/observation-precondition",
+  "http://hl7.org/fhir/StructureDefinition/observation-reagent",
+  "http://hl7.org/fhir/StructureDefinition/observation-replaces",
+  "http://hl7.org/fhir/StructureDefinition/observation-secondaryFinding",
+  "http://hl7.org/fhir/StructureDefinition/observation-sequelTo",
+  "http://hl7.org/fhir/StructureDefinition/observation-specimenCode",
+  "http://hl7.org/fhir/StructureDefinition/observation-timeOffset",
+  "http://hl7.org/fhir/StructureDefinition/openEHR-administration",
+  "http://hl7.org/fhir/StructureDefinition/openEHR-careplan",
+  "http://hl7.org/fhir/StructureDefinition/openEHR-exposureDate",
+  "http://hl7.org/fhir/StructureDefinition/openEHR-exposureDescription",
+  "http://hl7.org/fhir/StructureDefinition/openEHR-exposureDuration",
+  "http://hl7.org/fhir/StructureDefinition/openEHR-location",
+  "http://hl7.org/fhir/StructureDefinition/openEHR-management",
+  "http://hl7.org/fhir/StructureDefinition/openEHR-test",
+  "http://hl7.org/fhir/StructureDefinition/operationdefinition-allowed-type",
+  "http://hl7.org/fhir/StructureDefinition/operationdefinition-profile",
+  "http://hl7.org/fhir/StructureDefinition/operationoutcome-authority",
+  "http://hl7.org/fhir/StructureDefinition/operationoutcome-detectedIssue",
+  "http://hl7.org/fhir/StructureDefinition/operationoutcome-issue-source",
+  "http://hl7.org/fhir/StructureDefinition/ordinalValue",
+  "http://hl7.org/fhir/StructureDefinition/organization-period",
+  "http://hl7.org/fhir/StructureDefinition/organization-preferredContact",
+  "http://hl7.org/fhir/StructureDefinition/organizationaffiliation-primaryInd",
+  "http://hl7.org/fhir/StructureDefinition/originalText",
+  "http://hl7.org/fhir/StructureDefinition/parameters-fullUrl",
+  "http://hl7.org/fhir/StructureDefinition/patient-adoptionInfo",
+  "http://hl7.org/fhir/StructureDefinition/patient-animal",
+  "http://hl7.org/fhir/StructureDefinition/patient-birthPlace",
+  "http://hl7.org/fhir/StructureDefinition/patient-birthTime",
+  "http://hl7.org/fhir/StructureDefinition/patient-cadavericDonor",
+  "http://hl7.org/fhir/StructureDefinition/patient-citizenship",
+  "http://hl7.org/fhir/StructureDefinition/patient-congregation",
+  "http://hl7.org/fhir/StructureDefinition/patient-disability",
+  "http://hl7.org/fhir/StructureDefinition/patient-genderIdentity",
+  "http://hl7.org/fhir/StructureDefinition/patient-importance",
+  "http://hl7.org/fhir/StructureDefinition/patient-interpreterRequired",
+  "http://hl7.org/fhir/StructureDefinition/patient-mothersMaidenName",
+  "http://hl7.org/fhir/StructureDefinition/patient-nationality",
+  "http://hl7.org/fhir/StructureDefinition/patient-preferenceType",
+  "http://hl7.org/fhir/StructureDefinition/patient-proficiency",
+  "http://hl7.org/fhir/StructureDefinition/patient-relatedPerson",
+  "http://hl7.org/fhir/StructureDefinition/patient-religion",
+  "http://hl7.org/fhir/StructureDefinition/practitioner-animalSpecies",
+  "http://hl7.org/fhir/StructureDefinition/practitionerrole-primaryInd",
+  "http://hl7.org/fhir/StructureDefinition/procedure-approachBodyStructure",
+  "http://hl7.org/fhir/StructureDefinition/procedure-causedBy",
+  "http://hl7.org/fhir/StructureDefinition/procedure-directedBy",
+  "http://hl7.org/fhir/StructureDefinition/procedure-incisionDateTime",
+  "http://hl7.org/fhir/StructureDefinition/procedure-method",
+  "http://hl7.org/fhir/StructureDefinition/procedure-progressStatus",
+  "http://hl7.org/fhir/StructureDefinition/procedure-schedule",
+  "http://hl7.org/fhir/StructureDefinition/procedure-targetBodyStructure",
+  "http://hl7.org/fhir/StructureDefinition/quantity-precision",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-baseType",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-choiceOrientation",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-constraint",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-displayCategory",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-fhirType",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-hidden",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-maxOccurs",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-minOccurs",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-optionExclusive",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-optionPrefix",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-referenceFilter",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-referenceProfile",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-referenceResource",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-signatureRequired",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-sliderStepValue",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-supportLink",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-unit",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-unitOption",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-unitValueSet",
+  "http://hl7.org/fhir/StructureDefinition/questionnaire-usageMode",
+  "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-author",
+  "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-completionMode",
+  "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-reason",
+  "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-reviewer",
+  "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-signature",
+  "http://hl7.org/fhir/StructureDefinition/regex",
+  "http://hl7.org/fhir/StructureDefinition/relative-date",
+  "http://hl7.org/fhir/StructureDefinition/rendered-value",
+  "http://hl7.org/fhir/StructureDefinition/rendering-markdown",
+  "http://hl7.org/fhir/StructureDefinition/rendering-style",
+  "http://hl7.org/fhir/StructureDefinition/rendering-styleSensitive",
+  "http://hl7.org/fhir/StructureDefinition/rendering-xhtml",
+  "http://hl7.org/fhir/StructureDefinition/replaces",
+  "http://hl7.org/fhir/StructureDefinition/request-doNotPerform",
+  "http://hl7.org/fhir/StructureDefinition/request-insurance",
+  "http://hl7.org/fhir/StructureDefinition/request-performerOrder",
+  "http://hl7.org/fhir/StructureDefinition/request-relevantHistory",
+  "http://hl7.org/fhir/StructureDefinition/request-replaces",
+  "http://hl7.org/fhir/StructureDefinition/request-statusReason",
+  "http://hl7.org/fhir/StructureDefinition/resource-approvalDate",
+  "http://hl7.org/fhir/StructureDefinition/resource-effectivePeriod",
+  "http://hl7.org/fhir/StructureDefinition/resource-lastReviewDate",
+  "http://hl7.org/fhir/StructureDefinition/resource-pertainsToGoal",
+  "http://hl7.org/fhir/StructureDefinition/servicerequest-geneticsItem",
+  "http://hl7.org/fhir/StructureDefinition/servicerequest-precondition",
+  "http://hl7.org/fhir/StructureDefinition/servicerequest-questionnaireRequest",
+  "http://hl7.org/fhir/StructureDefinition/specimen-collectionPriority",
+  "http://hl7.org/fhir/StructureDefinition/specimen-isDryWeight",
+  "http://hl7.org/fhir/StructureDefinition/specimen-processingTime",
+  "http://hl7.org/fhir/StructureDefinition/specimen-sequenceNumber",
+  "http://hl7.org/fhir/StructureDefinition/specimen-specialHandling",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-ancestor",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-applicable-version",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-category",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-codegen-super",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-dependencies",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-display-hint",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-explicit-type-name",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-fhir-type",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-fmm-no-warnings",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-hierarchy",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-json-type",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-normative-version",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-rdf-type",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-security-category",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-standards-status",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-summary",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-table-name",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-template-status",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-wg",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-xml-no-order",
+  "http://hl7.org/fhir/StructureDefinition/structuredefinition-xml-type",
+  "http://hl7.org/fhir/StructureDefinition/task-candidateList",
+  "http://hl7.org/fhir/StructureDefinition/task-replaces",
+  "http://hl7.org/fhir/StructureDefinition/timing-dayOfMonth",
+  "http://hl7.org/fhir/StructureDefinition/timing-daysOfCycle",
+  "http://hl7.org/fhir/StructureDefinition/timing-exact",
+  "http://hl7.org/fhir/StructureDefinition/translation",
+  "http://hl7.org/fhir/StructureDefinition/tz-code",
+  "http://hl7.org/fhir/StructureDefinition/tz-offset",
+  "http://hl7.org/fhir/StructureDefinition/usagecontext-group",
+  "http://hl7.org/fhir/StructureDefinition/valueset-activityStatusDate",
+  "http://hl7.org/fhir/StructureDefinition/valueset-author",
+  "http://hl7.org/fhir/StructureDefinition/valueset-authoritativeSource",
+  "http://hl7.org/fhir/StructureDefinition/valueset-caseSensitive",
+  "http://hl7.org/fhir/StructureDefinition/valueset-concept-comments",
+  "http://hl7.org/fhir/StructureDefinition/valueset-concept-definition",
+  "http://hl7.org/fhir/StructureDefinition/valueset-conceptOrder",
+  "http://hl7.org/fhir/StructureDefinition/valueset-deprecated",
+  "http://hl7.org/fhir/StructureDefinition/valueset-effectiveDate",
+  "http://hl7.org/fhir/StructureDefinition/valueset-expand-group",
+  "http://hl7.org/fhir/StructureDefinition/valueset-expand-rules",
+  "http://hl7.org/fhir/StructureDefinition/valueset-expansionSource",
+  "http://hl7.org/fhir/StructureDefinition/valueset-expirationDate",
+  "http://hl7.org/fhir/StructureDefinition/valueset-expression",
+  "http://hl7.org/fhir/StructureDefinition/valueset-extensible",
+  "http://hl7.org/fhir/StructureDefinition/valueset-keyWord",
+  "http://hl7.org/fhir/StructureDefinition/valueset-label",
+  "http://hl7.org/fhir/StructureDefinition/valueset-map",
+  "http://hl7.org/fhir/StructureDefinition/valueset-otherName",
+  "http://hl7.org/fhir/StructureDefinition/valueset-parameterSource",
+  "http://hl7.org/fhir/StructureDefinition/valueset-reference",
+  "http://hl7.org/fhir/StructureDefinition/valueset-rules-text",
+  "http://hl7.org/fhir/StructureDefinition/valueset-sourceReference",
+  "http://hl7.org/fhir/StructureDefinition/valueset-special-status",
+  "http://hl7.org/fhir/StructureDefinition/valueset-steward",
+  "http://hl7.org/fhir/StructureDefinition/valueset-supplement",
+  "http://hl7.org/fhir/StructureDefinition/valueset-system",
+  "http://hl7.org/fhir/StructureDefinition/valueset-systemName",
+  "http://hl7.org/fhir/StructureDefinition/valueset-systemRef",
+  "http://hl7.org/fhir/StructureDefinition/valueset-toocostly",
+  "http://hl7.org/fhir/StructureDefinition/valueset-trusted-expansion",
+  "http://hl7.org/fhir/StructureDefinition/valueset-unclosed",
+  "http://hl7.org/fhir/StructureDefinition/valueset-usage",
+  "http://hl7.org/fhir/StructureDefinition/valueset-warning",
+  "http://hl7.org/fhir/StructureDefinition/valueset-workflowStatus",
+  "http://hl7.org/fhir/StructureDefinition/variable",
+  "http://hl7.org/fhir/StructureDefinition/workflow-episodeOfCare",
+  "http://hl7.org/fhir/StructureDefinition/workflow-instantiatesCanonical",
+  "http://hl7.org/fhir/StructureDefinition/workflow-instantiatesUri",
+  "http://hl7.org/fhir/StructureDefinition/workflow-reasonCode",
+  "http://hl7.org/fhir/StructureDefinition/workflow-reasonReference",
+  "http://hl7.org/fhir/StructureDefinition/workflow-relatedArtifact",
+  "http://hl7.org/fhir/StructureDefinition/workflow-researchStudy",
+  "http://hl7.org/fhir/StructureDefinition/workflow-supportingInfo",
+  "http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex",
+  "http://hl7.org/fhir/us/core/StructureDefinition/us-core-direct",
+  "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity",
+  "http://hl7.org/fhir/us/core/StructureDefinition/us-core-extension-questionnaire-uri",
+  "http://hl7.org/fhir/us/core/StructureDefinition/us-core-genderIdentity",
+  "http://hl7.org/fhir/us/core/StructureDefinition/us-core-jurisdiction",
+  "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race",
+  "http://hl7.org/fhir/us/core/StructureDefinition/us-core-sex",
+  "http://hl7.org/fhir/us/core/StructureDefinition/us-core-tribal-affiliation",
+  "http://hl7.org/fhir/us/core/StructureDefinition/uscdi-requirement"
+ ],
+ "mustSupport": {
+  "us-core-patient": {
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient",
+   "resourceType": "Patient",
+   "title": "US Core Patient Profile",
+   "elements": [
+    {
+     "path": "Patient.extension:race",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true,
+     "extensionUrl": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-race"
+    },
+    {
+     "path": "Patient.extension:ethnicity",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true,
+     "extensionUrl": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity"
+    },
+    {
+     "path": "Patient.extension:tribalAffiliation",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true,
+     "extensionUrl": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-tribal-affiliation"
+    },
+    {
+     "path": "Patient.extension:sex",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true,
+     "extensionUrl": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-sex"
+    },
+    {
+     "path": "Patient.extension:genderIdentity",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true,
+     "extensionUrl": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-genderIdentity"
+    },
+    {
+     "path": "Patient.identifier",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.identifier.system",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.identifier.value",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.name",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.name.use",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.name.family",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.name.given",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.name.suffix",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.name.period",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.telecom",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.telecom.system",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.telecom.value",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.telecom.use",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.gender",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.birthDate",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.deceased[x]",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.address",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.address.use",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.address.line",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.address.city",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.address.state",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.address.postalCode",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.address.period",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.communication",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "Patient.communication.language",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    }
+   ]
+  },
+  "us-core-condition-problems-health-concerns": {
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-problems-health-concerns",
+   "resourceType": "Condition",
+   "title": "US Core Condition Problems and Health Concerns Profile",
+   "elements": [
+    {
+     "path": "Condition.extension:assertedDate",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true,
+     "extensionUrl": "http://hl7.org/fhir/StructureDefinition/condition-assertedDate"
+    },
+    {
+     "path": "Condition.clinicalStatus",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.verificationStatus",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.category",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.code",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.subject",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.onset[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.abatement[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.recordedDate",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    }
+   ]
+  },
+  "us-core-condition-encounter-diagnosis": {
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-encounter-diagnosis",
+   "resourceType": "Condition",
+   "title": "US Core Condition Encounter Diagnosis Profile",
+   "elements": [
+    {
+     "path": "Condition.extension:assertedDate",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true,
+     "extensionUrl": "http://hl7.org/fhir/StructureDefinition/condition-assertedDate"
+    },
+    {
+     "path": "Condition.clinicalStatus",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.verificationStatus",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.category",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.code",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.subject",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.encounter",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.onset[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.abatement[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Condition.recordedDate",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    }
+   ]
+  },
+  "us-core-observation-lab": {
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-observation-lab",
+   "resourceType": "Observation",
+   "title": "US Core Laboratory Result Observation Profile",
+   "elements": [
+    {
+     "path": "Observation.status",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.category",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.code",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.subject",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.effective[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.value[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.dataAbsentReason",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.specimen",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    }
+   ]
+  },
+  "us-core-vital-signs": {
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-vital-signs",
+   "resourceType": "Observation",
+   "title": "US Core Vital Signs Profile",
+   "elements": [
+    {
+     "path": "Observation.status",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.category",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.code",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.subject",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.effective[x]",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.value[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.dataAbsentReason",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.component",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.component.code",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.component.value[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Observation.component.dataAbsentReason",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    }
+   ]
+  },
+  "us-core-encounter": {
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-encounter",
+   "resourceType": "Encounter",
+   "title": "US Core Encounter Profile",
+   "elements": [
+    {
+     "path": "Encounter.identifier",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.identifier.system",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.identifier.value",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.status",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.class",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.type",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.subject",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.participant",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.participant.type",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.participant.period",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.participant.individual",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.period",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.reasonCode",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.reasonReference",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.hospitalization",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.hospitalization.dischargeDisposition",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.location",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.location.location",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Encounter.serviceProvider",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    }
+   ]
+  },
+  "us-core-allergyintolerance": {
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-allergyintolerance",
+   "resourceType": "AllergyIntolerance",
+   "title": "US Core AllergyIntolerance Profile",
+   "elements": [
+    {
+     "path": "AllergyIntolerance.clinicalStatus",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "AllergyIntolerance.verificationStatus",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "AllergyIntolerance.code",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "AllergyIntolerance.patient",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "AllergyIntolerance.reaction",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "AllergyIntolerance.reaction.manifestation",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    }
+   ]
+  },
+  "us-core-immunization": {
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-immunization",
+   "resourceType": "Immunization",
+   "title": "US Core Immunization Profile",
+   "elements": [
+    {
+     "path": "Immunization.status",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Immunization.statusReason",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Immunization.vaccineCode",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Immunization.patient",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Immunization.occurrence[x]",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Immunization.primarySource",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    }
+   ]
+  },
+  "us-core-medicationrequest": {
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-medicationrequest",
+   "resourceType": "MedicationRequest",
+   "title": "US Core MedicationRequest Profile",
+   "elements": [
+    {
+     "path": "MedicationRequest.status",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.intent",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.category",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.reported[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.medication[x]",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.subject",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.encounter",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.authoredOn",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.requester",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.reasonCode",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.reasonReference",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.dosageInstruction",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.dosageInstruction.text",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.dosageInstruction.timing",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.dosageInstruction.doseAndRate",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.dosageInstruction.doseAndRate.dose[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.dispenseRequest",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.dispenseRequest.numberOfRepeatsAllowed",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "MedicationRequest.dispenseRequest.quantity",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    }
+   ]
+  },
+  "us-core-procedure": {
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-procedure",
+   "resourceType": "Procedure",
+   "title": "US Core Procedure Profile",
+   "elements": [
+    {
+     "path": "Procedure.basedOn",
+     "min": 0,
+     "mustSupport": false,
+     "uscdi": true
+    },
+    {
+     "path": "Procedure.status",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Procedure.code",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Procedure.subject",
+     "min": 1,
+     "mustSupport": true,
+     "uscdi": true
+    },
+    {
+     "path": "Procedure.performed[x]",
+     "min": 0,
+     "mustSupport": true,
+     "uscdi": true
+    }
+   ]
+  }
+ },
+ "skippedBindings": []
+}

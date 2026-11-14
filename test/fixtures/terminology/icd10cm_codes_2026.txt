@@ -1,0 +1,5 @@
+E1165   Type 2 diabetes mellitus with hyperglycemia
+E119    Type 2 diabetes mellitus without complications
+E663    Overweight
+C9200   Acute myeloblastic leukemia, not having achieved remission
+I10     Essential (primary) hypertension

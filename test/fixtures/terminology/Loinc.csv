@@ -1,0 +1,6 @@
+"LOINC_NUM","COMPONENT","PROPERTY","TIME_ASPCT","SYSTEM","SCALE_TYP","METHOD_TYP","CLASS","STATUS","SHORTNAME","LONG_COMMON_NAME","EXAMPLE_UCUM_UNITS"
+"4548-4","Hemoglobin A1c/Hemoglobin.total","MFr","Pt","Bld","Qn","","","ACTIVE","HbA1c MFr Bld","Hemoglobin A1c/Hemoglobin.total in Blood","%"
+"41995-2","Hemoglobin A1c","MCnc","Pt","Bld","Qn","","","ACTIVE","","Hemoglobin A1c [Mass/volume] in Blood","g/dL"
+"55454-3","Hemoglobin A1c","","","Bld","","","","DEPRECATED","","Deprecated Hemoglobin A1c in Blood",""
+"2345-7","Glucose","MCnc","Pt","Ser/Plas","Qn","","","ACTIVE","","Glucose [Mass/volume] in Serum or Plasma","mg/dL"
+"74774-1","Glucose","MCnc","Pt","Ser/Plas/Bld","Qn","","","ACTIVE","","Glucose [Mass/volume] in Serum, Plasma or Blood","mg/dL"

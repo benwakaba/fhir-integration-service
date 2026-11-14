@@ -1,0 +1,8 @@
+00001 E11     0 Type 2 diabetes mellitus                                     Type 2 diabetes mellitus
+00002 E116    0 Type 2 diabetes mellitus with oth complications              Type 2 diabetes mellitus with other specified complications
+00003 E1165   1 Type 2 diabetes mellitus with hyperglycemia                  Type 2 diabetes mellitus with hyperglycemia
+00004 E119    1 Type 2 diabetes mellitus without complications               Type 2 diabetes mellitus without complications
+00005 E663    1 Overweight                                                   Overweight
+00006 C920    0 Acute myeloblastic leukemia                                  Acute myeloblastic leukemia
+00007 C9200   1 Acute myeloblastic leukemia, not having achieved remission   Acute myeloblastic leukemia, not having achieved remission
+00008 I10     1 Essential (primary) hypertension                             Essential (primary) hypertension

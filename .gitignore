@@ -1,0 +1,12 @@
+node_modules
+.env
+.pgdata
+.DS_Store
+*.log
+
+# Licensed terminology releases (LOINC, ICD-10-CM) are loaded from local files, never committed
+data/terminology/
+.fhir-packages/
+
+# Local tooling config; the preview launcher reads the workspace-level one
+.claude/

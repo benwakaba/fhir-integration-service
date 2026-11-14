@@ -1,0 +1,37 @@
+{
+  "name": "fhir-integration-service",
+  "private": true,
+  "version": "0.1.0",
+  "description": "HL7 FHIR R4 ingestion and terminology normalization service (LOINC, ICD-10-CM), with conformance validation and resource versioning.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "db:start": "node scripts/dev-db.js",
+    "db:migrate": "node src/db/migrate.js",
+    "db:seed": "node src/db/seed.js",
+    "ingest": "node scripts/ingest.js",
+    "report": "node scripts/report.js",
+    "revalidate": "node scripts/revalidate.js",
+    "mpi:rebuild": "node scripts/rebuild-mpi.js",
+    "terminology:load": "node scripts/load-terminology.js",
+    "terminology:check": "node scripts/check-catalog.js",
+    "rules:build": "node scripts/build-validation-rules.js",
+    "demo:second-source": "node scripts/simulate-second-source.js",
+    "test": "node scripts/test.js"
+  },
+  "dependencies": {
+    "@asymmetrik/fhir-json-schema-validator": "^0.9.8",
+    "ajv": "^8.20.0",
+    "csv-parse": "^7.0.2",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "embedded-postgres": "^17.10.0-beta.17"
+  }
+}
