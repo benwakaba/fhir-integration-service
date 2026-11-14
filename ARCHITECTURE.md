@@ -66,9 +66,9 @@ page they came from.
 
 **Retries** (`src/fhir/client.js`) cover 408, 429, 500, 502, 503, 504 and network failures, with
 exponential backoff and equal jitter, bounded at 4 retries. `Retry-After` wins when sent. The
-timeout covers reading the body, not just the headers. When HAPI's public server went
-unreachable during development, runs failed after five attempts with the cause
-(`UND_ERR_CONNECT_TIMEOUT`) and were recorded as failed.
+timeout covers reading the body, not just the headers. When HAPI's public server was
+unreachable on 2026-09-24, runs failed after five attempts with the cause
+(`UND_ERR_CONNECT_TIMEOUT`) and were recorded as failed; the same pulls succeeded on 2026-11-13.
 
 **Idempotency.** Each page is stored in its own transaction: an interrupted run keeps what it
 finished, and re-running changes nothing (the first SMART re-run: 1,561 unchanged, 0 versions).
@@ -156,6 +156,12 @@ side table that ingest has to maintain. SQL groups resources by the set of codin
 so a large store reaches JavaScript as a few hundred distinct code sets. The conformance report
 uses the same definition of "reached", including panels mapped through their components.
 
+A system the service recognizes but does not load (WHO ICD-10, ICD-11, RxNorm and the others in
+`OTHER_STANDARD_SYSTEMS`) is labeled `unsupported-system`, not `local`. The first version called
+anything outside LOINC, ICD-10-CM and SNOMED CT local, which sent the reader to the wrong fix
+(a vendor-specific mapping) for a standard terminology; HAPI's WHO ICD-10 Conditions exposed it.
+Recognizing a system never aliases it, and the lookup endpoint names it the same way.
+
 ## Master patient index
 
 - **Serialized decisions.** Link decisions take a transaction-scoped advisory lock, so two sources delivering the same new person at the same moment cannot each create a golden record.
@@ -165,10 +171,11 @@ uses the same definition of "reached", including panels mapped through their com
 - **False merges over duplicates, as the worse failure.** The matching rules were tightened twice against the sandbox data, each time by rebuilding the index (`npm run mpi:rebuild`) and reading what changed:
   1. The first version linked any shared SSN. That merged records of at least two different people who share the "SSN" `56TYRU`. Survivorship caught the birthDate conflict and flagged review, but the charts were already merged. Now trusted identifiers are format-checked, and a match that contradicts birthDate or gender becomes a flagged possible duplicate.
   2. The second version still auto-linked on name and birthDate alone (a score of 0.85 or more), which made 419 links. That is probabilistic matching with nobody checking it. Now demographics only nominate candidates, and an identifier decides. Taking demographic linking away exposed what it had been covering for: 141 of the 142 look-alike groups shared an identifier value, usually an MRN or member id, that the matcher ignored because MRNs mean nothing across organizations. Inside their own namespace they do, so an identifier shared exactly now links when name and birthDate agree as well. The result is 809 people instead of 804: 414 of the 419 links are now backed by an identifier, and the records behind the other five are in a nine-record steward queue (no identifier at all, MRN `123456`, or a name change).
+- **What a second real source did to the queue.** Ingesting HAPI (1,013 Patient records, 922 people) grew the steward queue from 9 patients to 136, 127 of them HAPI's. The policy is doing what it should: HAPI's look-alikes are mostly one persona re-uploaded many times, each copy under an identifier of its own, which by name and birthDate alone cannot be told from different people who share both. But the queue is pairwise and `link` moves one record at a time, so the largest group (74 records) is not workable by hand. That is the cost of refusing to link on demographics, and the case for a group-level confirm. No SMART and HAPI patient link or even resemble each other (not one review candidate spans the two), so cross-source reconciliation is still exercised only by the simulated second source.
 
 ## Testing
 
-`npm test` runs 95 `node:test` tests against a real, throwaway Postgres (embedded on a free
+`npm test` runs 97 `node:test` tests against a real, throwaway Postgres (embedded on a free
 port, or `TEST_DATABASE_URL`), because JSONB containment, jsonpath, advisory locks and
 `FOR UPDATE` are the behavior under test. A mock FHIR server paginates like HAPI (opaque
 cursors) and injects 429/503 responses. Terminology fixtures use the exact official release

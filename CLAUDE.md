@@ -12,8 +12,9 @@ internal concepts, and serves one reconciled patient across sources:
 GET /patients/{id}/observations?concept=hba1c&since=2024-01-01
 ```
 
-**Status: working.** `npm test` passes 95 tests against a real Postgres. It has run against
-the SMART Health IT sandbox (27,215 resources) with LOINC 2.83 and ICD-10-CM FY2026 loaded.
+**Status: working.** `npm test` passes 97 tests against a real Postgres. It has run against
+the SMART Health IT sandbox (27,215 resources) and the HAPI public server (6,104 resources),
+with LOINC 2.83 and ICD-10-CM FY2026 loaded.
 Do not rebuild what is here; extend it.
 
 `README.md` is the user-facing description: setup, API, the conflict-resolution policy and
@@ -90,6 +91,11 @@ their reasons. Never derive membership by matching names: `86910-7` is an HbA1c 
 codes and checks LOINC check digits (term codes only). Units convert per concept with explicit
 rules; an unknown unit is reported, never guessed.
 
+**Recognized is not supported.** `OTHER_STANDARD_SYSTEMS` (`src/terminology/systems.js`) names
+standards the service does not load (WHO ICD-10, ICD-10-GM, ICD-11, ICD-9-CM, RxNorm, CPT, NDC,
+CVX), so the backlog says `unsupported-system` instead of `local`. Recognizing a system never
+aliases it: WHO ICD-10 is not ICD-10-CM, even when the code string exists in both.
+
 **Identity needs a shared identifier.** (`src/mpi/match.js`, policy in the README.) A trusted
 person identifier links unless birthDate or gender contradicts it. Any other identifier links
 only if it matches exactly *and* name and birthDate agree. Name and birthDate alone never
@@ -148,17 +154,20 @@ Tradeoffs, not oversights. Keep them documented rather than quietly half-fixing 
 - No SMART Backend Services auth toward sources; this API has only an optional shared key.
 - Pull ingest pages through FHIR search; there is no Bulk Data `$export` path.
 - Matching is rule-based with no probabilistic weighting, and the review queue is an API, not a UI.
+  It works one record at a time.
 - Unit conversion is per concept, not a general UCUM engine.
 
 ## Where to take it next
 
 Roughly in order of value:
 
-1. **Run the second pull source.** The HAPI public server was down for the whole first run, so
-   `GET /conformance` has never compared two real sources.
-2. **Work the terminology backlog.** Six basic-metabolic-panel analytes are the top unmapped
-   Observation codes on the sandbox data.
-3. **SNOMED CT**, once the UMLS license arrives: an RF2 loader plus `is-a` membership for
+1. **A group-level steward confirm.** HAPI's largest group of look-alikes is 74 records and
+   `link` moves one at a time, so its queue (127 patients) is not workable by hand.
+2. **A source with real patient overlap.** SMART and HAPI share no patients, so cross-source
+   reconciliation has only been exercised on the simulated second source.
+3. **Work the terminology backlog.** Six basic-metabolic-panel analytes lead SMART's unmapped
+   Observation codes; HAPI's lead with blood-count and liver analytes.
+4. **SNOMED CT**, once the UMLS license arrives: an RF2 loader plus `is-a` membership for
    condition concepts. 92.9% of the sandbox's Conditions are SNOMED-only.
-4. **FHIRPath invariants** as a fourth validation layer.
-5. **Bulk Data ingest** for population-scale pulls.
+5. **FHIRPath invariants** as a fourth validation layer.
+6. **Bulk Data ingest** for population-scale pulls.

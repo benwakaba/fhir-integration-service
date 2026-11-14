@@ -30,17 +30,19 @@ briefs an AI coding agent on the decisions that should not be undone.
 
 ## What the real data showed
 
-A run against the SMART Health IT R4 sandbox on 2026-09-24 ingested 27,215 resources
-(22,296 Observations, 1,990 Conditions, 2,924 Patients): 40 patients with HbA1c results in full,
-plus incremental syncs of recently updated resources. Everything below is from
-`npm run report -- --source smart` on that data, validated against LOINC 2.83 and ICD-10-CM
-FY2026. The sandbox is public and writable, so
-besides Synthea's generated patients it holds whatever other people have posted, which is
-where most of the mess is.
+Two runs, both validated against LOINC 2.83 and ICD-10-CM FY2026:
+
+- **SMART Health IT R4 sandbox**, 2026-09-24: 27,215 resources (22,296 Observations, 1,990 Conditions, 2,924 Patients). 40 patients with HbA1c results in full, plus incremental syncs of recently updated resources.
+- **HAPI public server**, 2026-11-13: 6,104 resources (4,033 Observations, 1,058 Conditions, 1,013 Patients). 40 patients with HbA1c results in full, plus recent syncs.
+
+The first three groups of findings below are SMART's (`npm run report -- --source smart`);
+[the last section](#two-sources-side-by-side) compares the two. Both servers are public and
+writable, so besides generated test patients they hold whatever other people have posted,
+which is where most of the mess is.
 
 **Conformance (US Core 6.1.0 expectations):**
 
-- `Condition.category`, required by US Core, is missing from 99.3% of Conditions.
+- `Condition.category`, required by US Core, is missing from 94.0% of Conditions.
 - `Patient.communication` (preferred language, a USCDI element) is omitted for 26.1% of patients.
 - `Observation.specimen` (Must Support on lab results) is never sent, `genderIdentity` never, and the USCDI v3 `sex` extension on 8 of 2,924 patients.
 - 73.5% of Patients carry Synthea's own extensions (DALY/QALY), which no IG defines; others carry Epic extensions (`open.epic.com/.../legal-sex`, `template-id`).
@@ -62,9 +64,42 @@ where most of the mess is.
 - No link rests on name and birthDate alone. Nine records are left for a steward instead: four identical "John Doe, 1990-01-01" records with no identifier at all; three "Jane Smith-First" records whose only identifier is MRN `123456` in a made-up namespace, which is too generic to be evidence; and two that share an identifier and a birthDate under different family names, which is what a name change looks like.
 - Four Patient records share the "SSN" `56TYRU`, next to an unrendered template placeholder `{{patient_drivers_license}}`. They belong to at least two different people (born 1980 and 1990), and a naive SSN match merged all four into one chart. That is why trusted identifiers are format-checked and why an identifier match that contradicts birthDate or gender is flagged, not linked (see [Matching](#matching)). Today they resolve to three people: the two records with the same MRN, name and birthDate are one, and the other two are the name-change pair above.
 
-The HAPI public server timed out on every connection for the rest of the session. Ingest
-retried with backoff, then recorded the runs as failed (`GET /ingest/runs`); rerun the HAPI
-commands below to add it to the comparison (`GET /conformance`).
+### Two sources side by side
+
+Sources differ, and absorbing that is what the service exists for. Share of resources that
+populate each element, from the stored data:
+
+| | SMART | HAPI |
+|---|---|---|
+| Patient.name | 100% | 78.8% |
+| Patient.telecom | 90.6% | 7.8% |
+| Patient.address | 91.1% | 5.6% |
+| Patient.communication | 73.9% | 1.6% |
+| Patient race extension | 91.3% | 3.9% |
+| Patient ethnicity extension | 91.2% | 0.2% |
+| Condition.onset[x] | 99.8% | 52.4% |
+| Condition.verificationStatus | 99.9% | 78.8% |
+| Condition.encounter | 93.0% | 37.3% |
+| Condition.category | 6.0% | 33.2% |
+| Observation.encounter | 89.9% | 0.0% |
+| Observation.referenceRange | 4.7% | 0.1% |
+| Observation.code as plain `http://loinc.org` | 91.2% | 100% |
+| Numeric Observations with a UCUM-coded unit | 95.9% | 99.9% |
+| Observation.code mapped to a concept | 50.2% | 37.9% |
+| Conditions coded only in SNOMED CT | 92.9% | 75.7% |
+
+So "HAPI omits `Patient.communication` for 98.4% of patients, SMART for 26.1%" is something the
+report produces per source, not an estimate. `GET /conformance` lists every source side by side.
+
+- HAPI's Conditions use SNOMED CT through its OID (2.6%, normalized), WHO ICD-10 (1.2%), ICD-11 (0.2%) and an invented `chartr.example` system (7%). WHO ICD-10 codes such as `I10` are reported as `unsupported-system` and never read as ICD-10-CM. HAPI's few outright errors are Conditions whose `clinicalStatus` has the right code but no system (8) and Conditions with no `subject` (3).
+- HAPI's 1,013 Patient records resolve to 922 people, and none of them is linked to a SMART patient or even resembles one: no review candidate spans the two. The servers hold different populations, so reconciliation across sources is still demonstrated only with the simulated second source (`npm run demo:second-source`).
+- 127 HAPI patients (192 source records, in 29 groups) are in the steward queue, against 9 for SMART. For 121 of them the reason is look-alikes with no identifier in common: mostly one persona re-uploaded many times, each copy with an identifier of its own, so name and birthDate are all there is and the policy leaves them for a steward. The largest group is 74 records. The queue works one record at a time (`link` moves a single record), which does not scale to that: a group-level confirm is the next step.
+
+These are snapshots. HAPI's numbers come from a smaller sample, and its Observations lean on one
+cohort: the 40 HbA1c patients supply 1,178 of the 4,033. The server is shared and everything on
+it was written on or after 2026-09-25, so a rerun will differ. The first attempt, on 2026-09-24,
+found HAPI timing out on every connection: ingest retried with backoff and recorded each run as
+failed with its cause (`GET /ingest/runs`), and the 2026-11-13 attempt succeeded.
 
 ## Tech stack
 
@@ -131,6 +166,12 @@ Pull 25 SMART patients who have an HbA1c result, with their Observations and Con
 npm run ingest -- --source smart --patients 25 --has-code "http://loinc.org|4548-4"
 ```
 
+The same pull from the HAPI public server:
+
+```bash
+npm run ingest -- --source hapi --patients 40 --has-code "http://loinc.org|4548-4"
+```
+
 Incrementally sync one resource type from its `_lastUpdated` high-water mark:
 
 ```bash
@@ -157,7 +198,7 @@ npm run report -- --source smart
 npm test
 ```
 
-95 tests. They start a throwaway embedded Postgres on a free port (or use `TEST_DATABASE_URL`)
+97 tests. They start a throwaway embedded Postgres on a free port (or use `TEST_DATABASE_URL`)
 and a mock FHIR server that paginates with opaque `_getpages` cursors and injects 429/503s.
 
 ## API
@@ -336,7 +377,7 @@ by its systolic and diastolic components. Each entry says what kind of work it i
 | `kind` | Meaning | What to do |
 |---|---|---|
 | `unmapped` | A valid code with no concept | Add it to a concept, or write a new one |
-| `unsupported-system` | SNOMED CT | Needs the SNOMED release |
+| `unsupported-system` | A standard terminology that is not loaded: SNOMED CT, WHO ICD-10, ICD-10-GM, ICD-11, ICD-9-CM, RxNorm, CPT, NDC, CVX | SNOMED CT needs a UMLS license; the others need a loader and a mapping |
 | `local` | Not a standard terminology, such as an Epic flowsheet id | Needs a mapping specific to that source |
 | `invalid` | Malformed, or not in the loaded release | Fix at the source; do not map |
 | `excluded` | Deliberately left out of a concept | Nothing; the entry gives the reason |
@@ -348,7 +389,9 @@ potassium, urea nitrogen) account for about 934 results each; glucose and creati
 two, are already concepts. Pain score and smoking status follow. For Conditions, 118 of the
 unmapped codes are SNOMED CT, and four of the most frequent are concepts the catalog already
 has under ICD-10-CM: prediabetes (91 Conditions), hypertension (73), obesity (71) and
-hyperlipidemia (43).
+hyperlipidemia (43). HAPI's list is different: its Observations lead with blood-count and liver
+analytes (platelets, globulin, ALT, albumin, AST, about 139 results each), and its Conditions
+with SNOMED stroke and myocardial infarction.
 
 ### Scope: LOINC and ICD-10-CM, not SNOMED CT
 
@@ -358,6 +401,11 @@ validated and reported. `lookup` says SNOMED is unsupported and why, the conditi
 returns SNOMED-only conditions marked unmapped rather than dropping them, and the conformance
 report counts them (92.9% of the sandbox's Conditions). Adding SNOMED means a loader for the
 RF2 description snapshot plus `is-a` membership for condition concepts. Nothing else changes.
+
+Other standard terminologies (WHO ICD-10, ICD-10-GM, ICD-11, ICD-9-CM, RxNorm, CPT, NDC, CVX)
+are recognized and named in the backlog and in lookups, but not loaded or mapped. A WHO ICD-10
+code is never read as ICD-10-CM, even when the string exists in both: HAPI sends both kinds, and
+the backlog calls the first one what it is.
 
 ## Conflict-resolution policy
 
@@ -465,7 +513,7 @@ fhir-integration-service/
 │   └── middleware/    API key, errors
 ├── scripts/           ingest, report, revalidate, mpi:rebuild, terminology:load,
 │                      terminology:check, rules:build, demo:second-source, dev-db, test
-└── test/              95 tests + fixtures in the official release file formats
+└── test/              97 tests + fixtures in the official release file formats
 ```
 
 ## Limitations and next steps
@@ -475,7 +523,8 @@ fhir-integration-service/
 - **Auth to real EHRs**: the sandboxes are open. A production source would need SMART Backend Services (client-credentials JWT); this service's own API has only an optional shared key.
 - **Scale**: patient-level pulls page through FHIR search. Population-scale ingest should use Bulk Data `$export`.
 - **Units**: conversions are concept-scoped and explicit, not a general UCUM engine.
-- **Matching** is rule-based, with no Fellegi-Sunter weighting, and the review queue is an API, not a UI. `npm run mpi:rebuild` regenerates golden ids and raises candidates a steward had dismissed again.
+- **Matching** is rule-based, with no Fellegi-Sunter weighting, and the review queue is an API, not a UI. It works one record at a time, which is not workable for HAPI's largest group of look-alikes (74 records): a group-level confirm is the first thing to add. `npm run mpi:rebuild` regenerates golden ids and raises candidates a steward had dismissed again.
+- **Cross-source reconciliation on real overlap** has not been exercised. SMART and HAPI share no patients, so it is demonstrated with a simulated second source.
 
 ---
 
