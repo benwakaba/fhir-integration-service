@@ -1,7 +1,7 @@
 // The terminology layer's read side: which code system releases are loaded, code
 // lookups against them, and concept resolution for a single code.
 
-import { CODE_SYSTEMS, LOINC, normalizeCoding } from './systems.js';
+import { CODE_SYSTEMS, LOINC, normalizeCoding, OTHER_STANDARD_SYSTEMS, unsupportedStandardNote } from './systems.js';
 import { conceptsFor, exclusionsFor } from './concepts.js';
 
 /** Map(url -> { url, name, version, content, includes, code_count, source, loaded_at }) */
@@ -52,15 +52,16 @@ export async function lookupCode(db, system, code) {
   const release = systems.get(normalized.system);
   const row = (await findCodes(db, [normalized])).get(`${normalized.system}|${normalized.code}`);
   const known = CODE_SYSTEMS[normalized.system];
+  const otherStandard = OTHER_STANDARD_SYSTEMS.get(normalized.system);
 
   return {
     input: { system, code },
     system: normalized.system,
     code: normalized.code,
     normalization: normalized.problems.filter((p) => p !== 'missing-system'),
-    systemName: known?.name ?? null,
+    systemName: known?.name ?? otherStandard ?? null,
     supported: Boolean(known) && !known.unsupported,
-    note: known?.unsupported,
+    note: known?.unsupported ?? (otherStandard && unsupportedStandardNote(otherStandard)),
     release: release
       ? { version: release.version, content: release.content, includes: release.includes, source: release.source }
       : null,

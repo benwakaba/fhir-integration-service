@@ -99,6 +99,14 @@ describe('lookup API', () => {
     assert.equal(body.supported, false);
     assert.match(body.note, /UMLS license/);
   });
+
+  test('WHO ICD-10 is named as unsupported and is not read as ICD-10-CM', async () => {
+    const { body } = await call(app.url, 'GET', '/terminology/lookup?system=http://hl7.org/fhir/sid/icd-10&code=I10');
+    assert.deepEqual([body.systemName, body.supported, body.system, body.concepts], ['ICD-10 (WHO)', false, 'http://hl7.org/fhir/sid/icd-10', []]);
+    assert.match(body.note, /does not load or map/);
+    const cm = await call(app.url, 'GET', '/terminology/lookup?system=icd10cm&code=I10');
+    assert.deepEqual(cm.body.concepts.map((c) => c.id), ['hypertension']); // same string, different system
+  });
 });
 
 describe('terminology backlog', () => {
@@ -174,6 +182,24 @@ describe('terminology backlog', () => {
       ['C95.80', 'invalid', undefined],
     ]);
     assert.match(body.backlog.find((b) => b.code === 'C95.80').note, /Not a valid ICD-10-CM code in FY2026/);
+  });
+
+  test('standard terminologies the service does not load are named, never called local', async () => {
+    await push([
+      patient('p1'),
+      condition('who', 'p1', { system: 'http://hl7.org/fhir/sid/icd-10', code: 'I10' }), // a code string that also exists in ICD-10-CM
+      condition('icd11', 'p1', { system: 'http://id.who.int/icd/release/11/mms', code: 'BA00', onset: '2023-07-01' }),
+      condition('theirs', 'p1', { system: 'https://chartr.example/synthetic-workflow', code: 'copd', onset: '2023-08-01' }),
+    ]);
+    const { body } = await call(app.url, 'GET', '/terminology/backlog?resourceType=Condition');
+    assert.equal(body.unmapped.resources, 3); // WHO ICD-10 I10 is not mapped to hypertension
+    const byCode = Object.fromEntries(body.backlog.map((b) => [b.code, b]));
+    assert.equal(byCode.I10.kind, 'unsupported-system');
+    assert.match(byCode.I10.note, /^ICD-10 \(WHO\) is a standard terminology this service does not load or map/);
+    assert.equal(byCode.BA00.kind, 'unsupported-system');
+    assert.match(byCode.BA00.note, /^ICD-11 MMS /);
+    assert.equal(byCode.copd.kind, 'local'); // an invented system really is local
+    assert.deepEqual(body.byKind['unsupported-system'], { codes: 2, resources: 2 });
   });
 
   test('only resource types with a concept domain have a backlog', async () => {

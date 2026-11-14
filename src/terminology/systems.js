@@ -18,6 +18,30 @@ export const CODE_SYSTEMS = {
   },
 };
 
+/**
+ * Standard terminologies the service recognizes but does not load or map. They are
+ * named so that a backlog entry or a lookup can say "ICD-10 (WHO), not loaded"
+ * instead of calling a well-known standard a local code. Recognizing a system never
+ * aliases it: WHO ICD-10 and ICD-10-GM are different code systems from ICD-10-CM,
+ * and ICD-11 is a different classification again.
+ */
+export const OTHER_STANDARD_SYSTEMS = new Map([
+  ['http://hl7.org/fhir/sid/icd-10', 'ICD-10 (WHO)'],
+  ['http://fhir.de/CodeSystem/dimdi/icd-10-gm', 'ICD-10-GM'],
+  ['http://fhir.de/CodeSystem/bfarm/icd-10-gm', 'ICD-10-GM'],
+  ['http://id.who.int/icd/release/11/mms', 'ICD-11 MMS'],
+  ['http://hl7.org/fhir/sid/icd-9-cm', 'ICD-9-CM'],
+  [RXNORM, 'RxNorm'],
+  ['http://www.ama-assn.org/go/cpt', 'CPT'],
+  ['http://hl7.org/fhir/sid/ndc', 'NDC'],
+  ['http://hl7.org/fhir/sid/cvx', 'CVX'],
+]);
+
+/** What to tell a caller about a standard system that is recognized but unsupported. */
+export function unsupportedStandardNote(name) {
+  return `${name} is a standard terminology this service does not load or map; its codes are stored and reported, but never treated as codes of another system, even when the same string exists there.`;
+}
+
 // Non-canonical URIs seen in the wild, keyed lowercase. Note what is deliberately
 // NOT here: http://hl7.org/fhir/sid/icd-10 is WHO ICD-10, a different code system
 // from the US clinical modification, and is never silently treated as ICD-10-CM.

@@ -3,12 +3,12 @@
 // catalog's to-do list, read off the data instead of guessed: the first row is
 // the mapping worth writing next. Each entry also says what kind of work it is,
 // because "unmapped" covers very different problems: a valid LOINC code nobody
-// has curated yet, a SNOMED code we cannot load, a vendor's local code, or a code
-// that does not exist and has to be fixed where it was entered.
+// has curated yet, a SNOMED or WHO ICD-10 code we cannot load, a vendor's local
+// code, or a code that does not exist and has to be fixed where it was entered.
 
 import { conceptsFor, exclusionsFor } from './concepts.js';
 import { covers, findCodes, loadedSystems } from './service.js';
-import { CODE_SYSTEMS, normalizeCoding } from './systems.js';
+import { CODE_SYSTEMS, normalizeCoding, OTHER_STANDARD_SYSTEMS, unsupportedStandardNote } from './systems.js';
 
 /** Resource types with a concept domain, and so with something to be mapped to. */
 export const BACKLOG_TYPES = { Observation: 'observation', Condition: 'condition' };
@@ -94,6 +94,7 @@ export async function terminologyBacklog(db, { resourceType, source = null, kind
 
 function describe(entry, systems, found, unmappedTotal) {
   const known = CODE_SYSTEMS[entry.system];
+  const otherStandard = OTHER_STANDARD_SYSTEMS.get(entry.system);
   const release = systems.get(entry.system);
   const row = found.get(`${entry.system}|${entry.code}`);
   const excluded = exclusionsFor(entry.system, entry.code);
@@ -108,6 +109,9 @@ function describe(entry, systems, found, unmappedTotal) {
   } else if (known?.unsupported) {
     kind = 'unsupported-system';
     note = known.unsupported;
+  } else if (otherStandard) {
+    kind = 'unsupported-system';
+    note = unsupportedStandardNote(otherStandard);
   } else if (!known) {
     kind = 'local';
     note = 'Not a standard terminology: needs a mapping specific to this source';
