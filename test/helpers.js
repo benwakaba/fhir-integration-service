@@ -18,7 +18,7 @@ export async function resetDb() {
     migrated = true;
   }
   await pool.query(`TRUNCATE sources, ingest_runs, resources, resource_versions, sync_cursors, validation_issues,
-    code_systems, codes, master_patients, master_patient_versions, patient_links RESTART IDENTITY CASCADE`);
+    code_systems, codes, master_patients, master_patient_versions, patient_links, dismissed_pairs RESTART IDENTITY CASCADE`);
   await seed(pool);
 }
 

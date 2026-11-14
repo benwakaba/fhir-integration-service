@@ -12,7 +12,7 @@ internal concepts, and serves one reconciled patient across sources:
 GET /patients/{id}/observations?concept=hba1c&since=2024-01-01
 ```
 
-**Status: working.** `npm test` passes 128 tests against a real Postgres. It has run against
+**Status: working.** `npm test` passes 148 tests against a real Postgres. It has run against
 the SMART Health IT sandbox (27,215 resources) and the HAPI public server (6,104 resources),
 with LOINC 2.83 and ICD-10-CM FY2026 loaded.
 Do not rebuild what is here; extend it.
@@ -116,10 +116,21 @@ it are refused. Records move as manual links with `matched_on.mergedFrom`, so `u
 one. `planConfirm` rewires review flags for a subset confirm and is pure; keep it that way.
 Dismissing a group (or named patients out of it) is the opposite decision behind the same
 ETag guard (`lockedGroup`): it clears flags, merges nothing, and returns the groups that
-remain with fresh ETags. Dismissals are not stored.
+remain with fresh ETags.
+
+**Dismissals are remembered against source records, not golden ids.** `mpi:rebuild`
+regenerates every golden id, so `dismissed_pairs` holds one row per pair of records
+(`src/mpi/dismissals.js`) and matching reads it back through wherever those records are
+linked now. A dismissed pair is neither flagged nor linked again: only a steward's `link` or
+`confirm` makes dismissed patients one person, and it deletes the dismissals it contradicts
+(the latest decision wins). A new *record* of a patient a steward already ruled out is not a
+new question; a new *patient* that resembles one is. `dismissedPairs` (pure) is exactly the
+flags `planDismiss` removes; keep the two in step.
 
 **Source records are mirrors; stewardship happens on the golden record.** A source's next
-version supersedes an edit made here. Overrides, links and dismissals belong to golden records.
+version supersedes an edit made here. Overrides and links belong to golden records, so
+`mpi:rebuild` loses them (it refuses without `--force`); dismissals belong to source records,
+which is why they survive it.
 
 **SNOMED CT is out of scope until licensed.** SNOMED-coded data is stored, reported and
 returned unmapped. Do not add SNOMED codes to the catalog or fixtures. Licensed releases are
@@ -155,7 +166,9 @@ test/              node:test suites, helpers.js, fixtures in the official releas
   (`resetDb`, `startApp`, `mockFhirServer`, fixture builders); do not mock the database.
 - Never log resource bodies or demographics.
 - Changing matching rules means `npm run mpi:rebuild` on real data and reading what changed
-  before updating the docs.
+  before updating the docs. Dismissals survive a rebuild and would hide what the new rules
+  raise, so judge the rules with `--forget-dismissals` (and `--force` if stewards have worked
+  the queue, on a copy of the database).
 
 ## Deliberate omissions
 
@@ -171,8 +184,9 @@ Tradeoffs, not oversights. Keep them documented rather than quietly half-fixing 
 
 Roughly in order of value:
 
-1. **A review UI, and remembered dismissals.** The queue and its group actions are an API
-   only, and a dismissal is not stored, so `npm run mpi:rebuild` raises it again.
+1. **A review UI.** The queue and its group actions are an API only. After it, remember
+   confirmations and overrides the way dismissals are (keyed on source records) so
+   `npm run mpi:rebuild` stops needing `--force`, and add a way to reopen a single dismissal.
 2. **A source with real patient overlap.** SMART and HAPI share no patients, so cross-source
    reconciliation has only been exercised on the simulated second source.
 3. **Work the terminology backlog.** Six basic-metabolic-panel analytes lead SMART's unmapped

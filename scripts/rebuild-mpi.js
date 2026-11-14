@@ -1,43 +1,34 @@
 // Rebuild the master patient index from the stored source Patients, e.g. after
-// changing matching rules. Golden record ids are regenerated, and steward work
-// (overrides, manual links) would be lost, so the script refuses to run while
-// any exists unless --force is given.
+// changing matching rules. Golden record ids are regenerated, so steward work on
+// golden records (overrides, manual links, confirmed merges) would be lost, and the
+// script refuses to run while any exists unless --force is given.
 //
-//   npm run mpi:rebuild [-- --force]
+// Dismissals ("these are different people") are kept: they are stored against source
+// records, so the candidates a steward dismissed are not raised again. Pass
+// --forget-dismissals to drop them too and start the review queue from scratch.
+//
+//   npm run mpi:rebuild                                  keeps dismissals
+//   npm run mpi:rebuild -- --forget-dismissals           starts the review queue from scratch
+//   npm run mpi:rebuild -- --force                       also loses overrides and manual links
 
 import { parseArgs } from 'node:util';
-import pool, { withTransaction } from '../src/db/pool.js';
-import { onPatientChanged } from '../src/mpi/index.js';
+import pool from '../src/db/pool.js';
+import { rebuildMpi } from '../src/mpi/rebuild.js';
 
-const { values } = parseArgs({ options: { force: { type: 'boolean', default: false } } });
+const { values } = parseArgs({
+  options: {
+    force: { type: 'boolean', default: false },
+    'forget-dismissals': { type: 'boolean', default: false },
+  },
+});
+
+const describe = ({ patients, records }) => `${patients} dismissed pair${patients === 1 ? '' : 's'} of patients (${records} record pairs)`;
 
 try {
-  const { rows: steward } = await pool.query(
-    `SELECT (SELECT count(*) FROM master_patients WHERE overrides <> '{}')::int AS overrides,
-            (SELECT count(*) FROM patient_links WHERE method = 'manual')::int AS manual`,
-  );
-  if ((steward[0].overrides || steward[0].manual) && !values.force) {
-    throw new Error(`${steward[0].overrides} override(s) and ${steward[0].manual} manual link(s) would be lost; re-run with --force`);
-  }
-  await pool.query('TRUNCATE patient_links, master_patient_versions, master_patients');
-  let lastId = 0;
-  let linked = 0;
-  for (;;) {
-    const { rows } = await pool.query(
-      `SELECT * FROM resources WHERE resource_type = 'Patient' AND NOT deleted AND id > $1 ORDER BY id LIMIT 200`,
-      [lastId],
-    );
-    if (!rows.length) break;
-    await withTransaction(async (client) => {
-      for (const row of rows) await onPatientChanged(client, row);
-    });
-    linked += rows.length;
-    lastId = rows.at(-1).id;
-  }
-  const { rows } = await pool.query(
-    `SELECT count(*)::int AS masters, count(*) FILTER (WHERE needs_review)::int AS review FROM master_patients`,
-  );
-  console.log(`Linked ${linked} source Patients into ${rows[0].masters} patients (${rows[0].review} need review).`);
+  const result = await rebuildMpi({ force: values.force, forgetDismissals: values['forget-dismissals'] });
+  console.log(`Linked ${result.linked} source Patients into ${result.patients} patients (${result.needReview} need review).`);
+  if (result.keptDismissals?.records) console.log(`Kept ${describe(result.keptDismissals)}; they were not raised again.`);
+  if (result.forgottenDismissals?.records) console.log(`Forgot ${describe(result.forgottenDismissals)}; the review queue starts from scratch.`);
 } catch (err) {
   console.error(`Rebuild failed: ${err.message}`);
   process.exitCode = 1;

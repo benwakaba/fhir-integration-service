@@ -4,7 +4,7 @@ import { contentHash } from '../src/fhir/canonical.js';
 import { clinicalTime, dateRange } from '../src/fhir/dates.js';
 import { parseEtag } from '../src/fhir/present.js';
 import { patientRefOf } from '../src/fhir/references.js';
-import { describeGroup, groupEtag, groupMasters, parseGroupEtag, planConfirm, planDismiss } from '../src/mpi/groups.js';
+import { describeGroup, dismissedPairs, groupEtag, groupMasters, parseGroupEtag, planConfirm, planDismiss } from '../src/mpi/groups.js';
 import { demographicScore, differingIdentifiers, identifierPatterns, jaroWinkler, sharedIdentifiers, trustedIdentifiers } from '../src/mpi/match.js';
 import { survive } from '../src/mpi/survivorship.js';
 import { conceptsFor, exclusionsFor, getConcept } from '../src/terminology/concepts.js';
@@ -306,5 +306,46 @@ describe('duplicate groups', () => {
   test('a dismissed patient loses flags that point outside the group too', () => {
     const [a, b] = [master('a', 1, ['b', 'ghost']), master('b', 2, ['a'])];
     assert.deepEqual(planDismiss([a, b], ['a']).get('a'), []);
+  });
+
+  describe('what a dismissal remembers', () => {
+    const chain = () => [master('a', 1, ['b']), master('b', 2, ['a', 'c']), master('c', 3, ['b'])]; // a and c never flagged
+
+    test('every flagged pair once, in a stable order, and never a pair that was not flagged', () => {
+      assert.deepEqual(dismissedPairs(chain(), ['a', 'b', 'c']), [['a', 'b'], ['b', 'c']]); // not ['a', 'c']
+      assert.deepEqual(dismissedPairs(chain().reverse(), ['c', 'b', 'a']).map((p) => p.join('|')).sort(), ['a|b', 'b|c']);
+    });
+
+    test('dismissing some patients remembers the pairs they were in, not the flags among the rest', () => {
+      assert.deepEqual(dismissedPairs(chain(), ['c']), [['b', 'c']]); // a-b stays flagged, so it is not remembered
+      assert.deepEqual(dismissedPairs(chain(), ['a']), [['a', 'b']]);
+      assert.deepEqual(dismissedPairs([master('a', 1, ['b', 'c']), master('b', 2, ['a', 'c']), master('c', 3, ['a', 'b'])], ['a', 'b']), [['a', 'b'], ['a', 'c'], ['b', 'c']]);
+    });
+
+    test('a flag listed on one side only is still a pair, whichever side lists it, and a flag to oneself is not', () => {
+      const members = [master('b', 2, ['a']), master('a', 1), master('c', 3, ['c'])]; // a does not list b back
+      assert.deepEqual(dismissedPairs(members, ['a', 'b', 'c']), [['a', 'b']]);
+      assert.deepEqual(dismissedPairs(members, ['a']), [['a', 'b']]); // b lists a and only a is dismissed: planDismiss drops that flag too
+      assert.deepEqual(dismissedPairs(members, ['b']), [['a', 'b']]); // b is dismissed and lists a
+      assert.deepEqual(dismissedPairs(members, ['c']), []); // the flag to itself is nothing
+    });
+
+    test('it covers exactly the flags planDismiss removes, in every case planDismiss is tested on', () => {
+      const pairsOf = (members) => new Set(members.flatMap((m) => m.possible_duplicates.map((d) => [m.id, d.masterId].sort().join('|'))));
+      const cases = [
+        { members: [master('a', 1, ['b', 'c']), master('b', 2, ['a', 'c']), master('c', 3, ['a', 'b'])], dismissed: ['a', 'b', 'c'] },
+        { members: [master('a', 1, ['b', 'c', 'd']), master('b', 2, ['a', 'c']), master('c', 3, ['a', 'b', 'd']), master('d', 4, ['a', 'c'])], dismissed: ['d'] },
+        { members: [master('a', 1, ['b', 'c']), master('b', 2, ['a', 'c']), master('c', 3, ['a', 'b', 'd', 'e']), master('d', 4, ['c', 'e']), master('e', 5, ['c', 'd'])], dismissed: ['c'] },
+        { members: chain(), dismissed: ['a'] },
+        { members: chain(), dismissed: ['b'] },
+        { members: [master('b', 2, ['a']), master('a', 1)], dismissed: ['a'] }, // flagged from the other side only
+      ];
+      for (const { members, dismissed } of cases) {
+        const before = pairsOf(members);
+        const after = pairsOf(applied(members, planDismiss(members, dismissed)));
+        const removed = [...before].filter((pair) => !after.has(pair)).sort();
+        assert.deepEqual(dismissedPairs(members, dismissed).map((p) => p.join('|')).sort(), removed, `dismissing ${dismissed}`);
+      }
+    });
   });
 });

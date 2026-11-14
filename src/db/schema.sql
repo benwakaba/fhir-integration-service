@@ -173,3 +173,21 @@ CREATE TABLE IF NOT EXISTS patient_links (
 );
 
 CREATE INDEX IF NOT EXISTS idx_patient_links_master ON patient_links (master_id);
+
+-- A steward's "these are different people", kept as pairs of SOURCE records. mpi:rebuild
+-- regenerates every golden id, so a decision keyed on golden ids would be forgotten by
+-- the first rebuild; source records are what survive it. One row for each pair of
+-- records, one from each dismissed patient, with record_a < record_b so a pair has a
+-- single spelling. Matching will not link or flag a record against a patient that holds
+-- a record dismissed against it; a steward's link or confirm deletes the pairs it
+-- contradicts, because the latest decision wins.
+CREATE TABLE IF NOT EXISTS dismissed_pairs (
+  record_a BIGINT NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+  record_b BIGINT NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+  via TEXT NOT NULL,                        -- how the steward dismissed it: 'pair' | 'group'
+  dismissed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (record_a, record_b),
+  CHECK (record_a < record_b)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dismissed_pairs_b ON dismissed_pairs (record_b);

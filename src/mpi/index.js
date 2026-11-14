@@ -17,7 +17,8 @@ import {
   sharedIdentifiers,
   trustedIdentifiers,
 } from './match.js';
-import { groupMasters, loadGroupOf, loadMembers, parseGroupEtag, planConfirm, planDismiss } from './groups.js';
+import { dismissedAgainstPatient, dismissedAgainstRecord, forgetDismissalsWithin, rememberDismissals } from './dismissals.js';
+import { dismissedPairs, groupMasters, loadGroupOf, loadMembers, parseGroupEtag, planConfirm, planDismiss } from './groups.js';
 import { survive } from './survivorship.js';
 
 // Link decisions are serialized: two sources delivering the same new person at
@@ -42,7 +43,11 @@ export async function onPatientChanged(client, row) {
     'INSERT INTO patient_links (resource_id, master_id, method, score, matched_on) VALUES ($1, $2, $3, $4, $5)',
     [row.id, masterId, match?.method ?? 'new', match?.score ?? null, match ? JSON.stringify(match.matchedOn) : null],
   );
+  // A steward may have ruled these out against the patient this record joined, not just
+  // against this record: a new record of a person they already judged is the same question.
+  const ruledOut = possibleDuplicates.length ? await dismissedAgainstPatient(client, masterId) : new Set();
   for (const dup of possibleDuplicates) {
+    if (ruledOut.has(dup.masterId)) continue;
     const note = { reason: dup.reason, identifiers: dup.identifiers, score: dup.score, record: `${row.source_id}/Patient/${row.fhir_id}` };
     await addPossibleDuplicate(client, masterId, { masterId: dup.masterId, ...note });
     const added = await addPossibleDuplicate(client, dup.masterId, { masterId, ...note });
@@ -73,6 +78,9 @@ async function addPossibleDuplicate(client, masterId, entry) {
 async function findMatch(client, row) {
   const patient = row.resource;
   const possibleDuplicates = [];
+  // Patients a steward already decided this record is not: not candidates for anything,
+  // neither a link nor a flag. Only a steward's own link or confirm can undo that.
+  const ruledOut = await dismissedAgainstRecord(client, row.id);
 
   // 1. Deterministic: a trusted identifier already on file, not contradicted by
   //    birthDate or gender. Merging two people is worse than keeping a duplicate.
@@ -93,6 +101,7 @@ async function findMatch(client, row) {
     );
     const systems = identifiers.map((i) => i.system);
     for (const candidate of rows) {
+      if (ruledOut.has(candidate.master_id)) continue;
       const reason = contradicts(patient, candidate.golden);
       if (reason) {
         possibleDuplicates.push({ masterId: candidate.master_id, reason: `shares ${systems.join(', ')} but ${reason}`, identifiers: systems });
@@ -119,7 +128,7 @@ async function findMatch(client, row) {
   const similar = new Map(); // master -> its most convincing record
   const renamed = new Map(); // master -> identifier systems shared by a record whose name differs
   for (const c of candidates) {
-    if (possibleDuplicates.some((d) => d.masterId === c.master_id)) continue;
+    if (ruledOut.has(c.master_id) || possibleDuplicates.some((d) => d.masterId === c.master_id)) continue;
     const score = demographicScore(patient, c.resource);
     const shared = sharedIdentifiers(patient, c.resource);
     if (score < CANDIDATE_THRESHOLD) {
@@ -280,17 +289,22 @@ export async function linkRecord(client, masterId, sourceId, fhirId, expectedVer
   const link = await findLink(client, sourceId, fhirId);
   if (link.master_id === masterId) throw badRequest(`${sourceId}/Patient/${fhirId} is already linked to patient ${masterId}`);
   await client.query(`UPDATE patient_links SET master_id = $2, method = 'manual', score = NULL, linked_at = now() WHERE resource_id = $1`, [link.resource_id, masterId]);
-  // The merge settles any possible-duplicate flag between the two masters.
+  // The merge settles any possible-duplicate flag between the two masters, and any
+  // earlier "different people" between records that are now one person: the latest
+  // decision wins, and a leftover dismissal would hide them again after a rebuild.
   await removePossibleDuplicate(client, masterId, link.master_id);
   await removePossibleDuplicate(client, link.master_id, masterId);
+  await forgetDismissalsWithin(client, masterId);
   const { rows } = await client.query('SELECT count(*)::int AS n FROM patient_links WHERE master_id = $1', [link.master_id]);
   const emptied = rows[0].n === 0;
   if (emptied) {
     await moveOpenFlags(client, link.master_id, masterId);
     await client.query('UPDATE master_patients SET merged_into = $2 WHERE id = $1', [link.master_id, masterId]);
   }
+  const settled = await settleDismissedFlags(client, masterId);
+  for (const id of settled) await recomputeGolden(client, id, `possible duplicate of ${masterId} settled by an earlier dismissal`, { always: true });
   await recomputeGolden(client, link.master_id, emptied ? `merged into ${masterId}` : `${sourceId}/Patient/${fhirId} moved to ${masterId}`, { always: emptied });
-  return recomputeGolden(client, masterId, `linked ${sourceId}/Patient/${fhirId} manually`);
+  return recomputeGolden(client, masterId, `linked ${sourceId}/Patient/${fhirId} manually`, { always: settled.length > 0 });
 }
 
 // A master emptied by a merge keeps no open questions: its unresolved possible
@@ -331,7 +345,8 @@ function setFlags(client, id, flags) {
  * group: they lose every flag, and the rest stay flagged among themselves. Nothing
  * merges and no record moves. The groups that remain among the patients who were not
  * dismissed come back with fresh ETags, so a steward can carry on (confirm what is
- * left, say) without reading again.
+ * left, say) without reading again. Every pair of patients whose flag goes is
+ * remembered (`remembered` counts them), so a rebuild does not raise them again.
  */
 export async function dismissGroup(client, memberId, expectedToken, { patients = null } = {}) {
   const group = await lockedGroup(client, memberId, expectedToken, 'dismissing');
@@ -344,6 +359,8 @@ export async function dismissGroup(client, memberId, expectedToken, { patients =
 
   const changes = planDismiss(group.members, dismissed);
   await client.query('SELECT id FROM master_patients WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[...inGroup]]);
+  const settled = dismissedPairs(group.members, dismissed);
+  await rememberDismissals(client, settled, 'group');
   for (const [id, flags] of changes) await setFlags(client, id, flags);
 
   const stillNeedReview = []; // dismissed patients can still need review for other reasons, such as a conflict
@@ -357,7 +374,7 @@ export async function dismissGroup(client, memberId, expectedToken, { patients =
 
   const rest = group.members.filter((m) => !dismissedSet.has(m.id)).map((m) => m.id);
   const remaining = rest.length > 1 ? groupMasters(await loadMembers(client, rest)).sort((a, b) => b.records - a.records) : [];
-  return { dismissed, remaining, stillNeedReview };
+  return { dismissed, remembered: settled.length, remaining, stillNeedReview };
 }
 
 /**
@@ -390,12 +407,14 @@ export async function confirmGroup(client, memberId, expectedToken, { patients =
      WHERE master_id = ANY($2::uuid[])`,
     [survivorId, plan.mergedAway],
   );
+  await forgetDismissalsWithin(client, survivorId); // as in linkRecord: the latest decision wins
   await setFlags(client, survivorId, plan.survivorFlags);
   for (const [id, flags] of plan.outsiderFlags) await setFlags(client, id, flags);
   await client.query(
     `UPDATE master_patients SET possible_duplicates = '[]', needs_review = false, merged_into = $2 WHERE id = ANY($1::uuid[])`,
     [plan.mergedAway, survivorId],
   );
+  await settleDismissedFlags(client, survivorId); // anyone it touches is an outsider, recomputed below
 
   const master = await recomputeGolden(client, survivorId, `confirmed ${selected.length} patients as one person`, { always: true });
   for (const id of plan.mergedAway) await recomputeGolden(client, id, `merged into ${survivorId}`, { always: true });
@@ -414,18 +433,41 @@ export async function confirmGroup(client, memberId, expectedToken, { patients =
 
 /**
  * A steward decided flagged masters are different people: one pair when
- * `otherId` is given, otherwise every flag on this master.
+ * `otherId` is given, otherwise every flag on this master. Each pair is remembered
+ * (`remembered` counts them) so that a rebuild does not raise it again.
+ * Returns { master, remembered }.
  */
 export async function dismissPossibleDuplicates(client, masterId, expectedVersion, otherId = null) {
   const master = await lockMaster(client, masterId, expectedVersion);
   const dismissed = master.possible_duplicates.filter((dup) => !otherId || dup.masterId === otherId);
   if (otherId && !dismissed.length) throw badRequest(`Patient ${otherId} is not flagged as a possible duplicate of ${masterId}`);
+  await rememberDismissals(client, dismissed.map((dup) => [masterId, dup.masterId]), 'pair');
   for (const dup of dismissed) {
     await removePossibleDuplicate(client, dup.masterId, masterId);
     await removePossibleDuplicate(client, masterId, dup.masterId);
     await recomputeGolden(client, dup.masterId, `possible duplicate of ${masterId} dismissed`, { always: true });
   }
-  return recomputeGolden(client, masterId, otherId ? `possible duplicate of ${otherId} dismissed` : 'possible duplicates dismissed', { always: dismissed.length > 0 });
+  const updated = await recomputeGolden(client, masterId, otherId ? `possible duplicate of ${otherId} dismissed` : 'possible duplicates dismissed', { always: dismissed.length > 0 });
+  return { master: updated, remembered: dismissed.length };
+}
+
+/**
+ * Drop the flags between this patient and any patient a steward has ruled out against
+ * it. A merge unites what was ruled out for each side, so an open question can become
+ * one the steward already answered (dismiss A and S, then confirm A and H while H and S
+ * are still flagged: the flag would move to the merged patient). Returns the patients
+ * whose flags changed; the caller recomputes them, and this patient.
+ */
+async function settleDismissedFlags(client, masterId) {
+  const ruledOut = await dismissedAgainstPatient(client, masterId);
+  if (!ruledOut.size) return [];
+  const { rows } = await client.query('SELECT possible_duplicates FROM master_patients WHERE id = $1', [masterId]);
+  const settled = rows[0].possible_duplicates.map((d) => d.masterId).filter((id) => ruledOut.has(id));
+  for (const id of settled) {
+    await removePossibleDuplicate(client, masterId, id);
+    await removePossibleDuplicate(client, id, masterId);
+  }
+  return settled;
 }
 
 async function removePossibleDuplicate(client, masterId, otherId) {

@@ -6,6 +6,7 @@ import { Router } from 'express';
 import pool, { withTransaction } from '../db/pool.js';
 import { badRequest, notFound, preconditionRequired } from '../errors.js';
 import { etag, parseEtag, presentGolden } from '../fhir/present.js';
+import { dismissedPartners } from '../mpi/dismissals.js';
 import { describeGroup, loadGroupOf, loadGroups, parseGroupEtag } from '../mpi/groups.js';
 import { confirmGroup, dismissGroup, dismissPossibleDuplicates, linkRecord, setOverrides, unlinkRecord } from '../mpi/index.js';
 import { everything } from '../mpi/everything.js';
@@ -98,14 +99,20 @@ router.post('/duplicate-groups/:id/confirm', async (req, res) => {
 
 // The opposite decision: these are different people. Body, optional: { patients: [ids] }
 // dismisses only those from the group (the rest stay flagged among themselves); with no
-// body the whole group is dismissed. Nothing merges. The groups that remain come back
-// with fresh ETags.
+// body the whole group is dismissed. Nothing merges. The decision is remembered, so a
+// rebuild does not raise it again (`remembered` counts the pairs of patients). The groups
+// that remain come back with fresh ETags.
 router.post('/duplicate-groups/:id/dismiss', async (req, res) => {
   const token = requireGroupIfMatch(req);
   const { patients = null } = req.body ?? {};
   if (patients !== null && (!Array.isArray(patients) || patients.some((p) => typeof p !== 'string'))) throw badRequest('patients must be an array of patient ids');
   const result = await withTransaction((client) => dismissGroup(client, req.params.id, token, { patients }));
-  res.json({ dismissed: result.dismissed, remaining: result.remaining.map(describeGroup), stillNeedReview: result.stillNeedReview });
+  res.json({
+    dismissed: result.dismissed,
+    remembered: result.remembered,
+    remaining: result.remaining.map(describeGroup),
+    stillNeedReview: result.stillNeedReview,
+  });
 });
 
 router.get('/:id', async (req, res) => {
@@ -117,6 +124,7 @@ router.get('/:id', async (req, res) => {
     golden: presentGolden(master),
     conflicts: master.conflicts,
     possibleDuplicates: master.possible_duplicates,
+    dismissedDuplicates: await dismissedPartners(pool, master.id), // patients a steward ruled out as the same person
     overrides: master.overrides,
     links: links.map((l) => ({
       source: l.source_id,
@@ -229,12 +237,17 @@ router.post('/:id/link', async (req, res) => {
 });
 
 // Not the same person after all. Body { "patient": "<id>" } settles one pair;
-// no body dismisses every flag on this patient.
+// no body dismisses every flag on this patient. Remembered, like a group dismissal.
 router.post('/:id/dismiss-duplicates', async (req, res) => {
   const expected = requireIfMatch(req);
   const other = req.body?.patient ?? null;
-  const master = await withTransaction((client) => dismissPossibleDuplicates(client, req.params.id, expected, other));
-  res.set('ETag', etag(master.version_id)).json({ version: master.version_id, needsReview: master.needs_review, possibleDuplicates: master.possible_duplicates });
+  const { master, remembered } = await withTransaction((client) => dismissPossibleDuplicates(client, req.params.id, expected, other));
+  res.set('ETag', etag(master.version_id)).json({
+    version: master.version_id,
+    needsReview: master.needs_review,
+    possibleDuplicates: master.possible_duplicates,
+    remembered,
+  });
 });
 
 function requireGroupIfMatch(req) {

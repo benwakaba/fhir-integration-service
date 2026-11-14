@@ -134,6 +134,27 @@ export function planDismiss(members, dismissedIds) {
   return changes;
 }
 
+/**
+ * The pairs of patients a dismissal settles, to be remembered: every flag that
+ * `planDismiss` removes, once per pair (flags are symmetric, so each shows up on both
+ * sides). Same reach as planDismiss on purpose: what is remembered is what the steward
+ * saw disappear. Two patients who were never flagged against each other are not
+ * remembered as different, so a chain's unflagged ends can still be raised later.
+ * Each pair comes back as [a, b] with a < b.
+ */
+export function dismissedPairs(members, dismissedIds) {
+  const dismissed = new Set(dismissedIds);
+  const pairs = new Map();
+  for (const m of members) {
+    for (const d of flagsOf(m)) {
+      if (d.masterId === m.id || !(dismissed.has(m.id) || dismissed.has(d.masterId))) continue;
+      const pair = m.id < d.masterId ? [m.id, d.masterId] : [d.masterId, m.id];
+      pairs.set(pair.join('|'), pair);
+    }
+  }
+  return [...pairs.values()];
+}
+
 function memberSummary(m) {
   const name = m.golden?.name?.[0];
   return {

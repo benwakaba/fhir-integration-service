@@ -198,7 +198,7 @@ npm run report -- --source smart
 npm test
 ```
 
-128 tests. They start a throwaway embedded Postgres on a free port (or use `TEST_DATABASE_URL`)
+148 tests. They start a throwaway embedded Postgres on a free port (or use `TEST_DATABASE_URL`)
 and a mock FHIR server that paginates with opaque `_getpages` cursors and injects 429/503s.
 
 ## API
@@ -210,7 +210,7 @@ Examples assume `http://localhost:5051`. When `API_KEY` is set, send `Authorizat
 | Method | Path | |
 |---|---|---|
 | GET | `/patients?name=&source=&needsReview=&multiSource=` | Golden patients. `needsReview=true` is the steward's queue. |
-| GET | `/patients/{id}` | Golden record, linked source records, conflicts, possible duplicates. Returns `ETag`. |
+| GET | `/patients/{id}` | Golden record, linked source records, conflicts, possible duplicates, and the patients a steward has ruled out (`dismissedDuplicates`). Returns `ETag`. |
 | GET | `/patients/{id}/observations?concept=hba1c,glucose&since=&until=&limit=` | Normalized results across sources |
 | GET | `/patients/{id}/conditions?concept=&status=active&since=` | Conditions by concept; unmapped (SNOMED-only) ones included and counted |
 | GET | `/patients/{id}/summary` | Latest value per concept, active conditions |
@@ -218,11 +218,11 @@ Examples assume `http://localhost:5051`. When `API_KEY` is set, send `Authorizat
 | GET | `/patients/{id}/history` | Golden record versions and why each changed |
 | PUT | `/patients/{id}/overrides` | Steward pins element values. Requires `If-Match`. |
 | POST | `/patients/{id}/link`, `/unlink` | Confirm a possible duplicate, or undo a wrong link: `{ "source", "fhirId" }`. Requires `If-Match`. |
-| POST | `/patients/{id}/dismiss-duplicates` | Not the same person after all: `{ "patient": "<id>" }` settles one candidate, no body settles all. Requires `If-Match`. |
+| POST | `/patients/{id}/dismiss-duplicates` | Not the same person after all: `{ "patient": "<id>" }` settles one candidate, no body settles all. Remembered across `mpi:rebuild`; `remembered` counts the pairs of patients. Requires `If-Match`. |
 | GET | `/patients/duplicate-groups?source=&limit=&offset=` | Groups of look-alike patients (connected by review flags), biggest first. Each has an `etag` and says whether every pair is flagged (`complete`). |
 | GET | `/patients/duplicate-groups/{id}` | One group; `id` can be any member. Returns the group's `ETag`. |
 | POST | `/patients/duplicate-groups/{id}/confirm` | Confirm a group as one person. `If-Match` is the group's ETag. Optional body: `{ "patients": [...], "survivor": "<id>" }`. |
-| POST | `/patients/duplicate-groups/{id}/dismiss` | Not the same people after all: dismisses the whole group, or only the patients named in `patients` (they lose every flag; the rest stay flagged among themselves). `If-Match` is the group's ETag. Returns the groups that remain, with fresh ETags. |
+| POST | `/patients/duplicate-groups/{id}/dismiss` | Not the same people after all: dismisses the whole group, or only the patients named in `patients` (they lose every flag; the rest stay flagged among themselves). `If-Match` is the group's ETag. Returns the groups that remain, with fresh ETags, and `remembered`, the pairs of patients it will not raise again. |
 
 An observation in the response:
 
@@ -438,7 +438,7 @@ Links are sticky: a later change to a linked record is re-survived, not re-match
 works the queue (`GET /patients?needsReview=true`) with three actions:
 
 - `link` confirms a candidate: its record joins this patient, and any other open candidates follow it.
-- `dismiss-duplicates` says they are different people, for one candidate or all.
+- `dismiss-duplicates` says they are different people, for one candidate or all. The decision is remembered (below).
 - `unlink` undoes a wrong link.
 
 Each requires If-Match, and each moves the patient's ETag, so two stewards cannot act on the
@@ -467,9 +467,30 @@ lose every flag while the rest stay flagged among themselves. That is how a mixe
 worked: dismiss the odd one out, then confirm what is left. The response returns the groups
 that remain, each with a fresh ETag, so nothing has to be read again in between, and it lists
 any dismissed patient that still needs review for another reason (a conflict between its own
-records). Nothing merges and no record moves. A dismissed pair stays dismissed when a new
-look-alike arrives (only the newcomer is flagged), but dismissals are not stored:
-`npm run mpi:rebuild` raises them again.
+records). Nothing merges and no record moves.
+
+A dismissal is remembered. `npm run mpi:rebuild` regenerates every golden id, so the decision is
+stored against the patients' source records instead (a row for each pair of records, in
+`dismissed_pairs`) and read back through wherever those records are linked now. In practice:
+
+- A dismissed pair is not raised again, and it is not linked automatically either: only a
+  steward's `link` or `confirm` can make dismissed patients one person. If a source later
+  corrects the typo that made two records look different, they stay apart until a steward
+  says otherwise.
+- A new look-alike is a new question: it is flagged against every patient it resembles,
+  dismissed ones included, and the dismissed patients are not flagged against each other.
+  Another record of a patient a steward already ruled out is not a new question: an MRN seen
+  a second time joins its patient without raising the old pair.
+- The latest decision wins. Linking or confirming records as one person deletes any dismissal
+  between them, and a flag that a merge would carry onto a patient a steward ruled out is
+  dropped.
+- It is visible: `GET /patients/{id}` lists `dismissedDuplicates`, and the dismiss calls
+  report how many pairs of patients were `remembered`.
+
+A rebuild keeps dismissals, so they need no `--force` (it still refuses to run over overrides
+and manual links). `npm run mpi:rebuild -- --forget-dismissals` drops them too, to see the queue
+the matching rules raise on their own (add `--force` if there are overrides or manual links to
+lose). There is no way yet to reopen a single pair.
 
 ### Survivorship
 
@@ -544,7 +565,7 @@ fhir-integration-service/
 │   └── middleware/    API key, errors
 ├── scripts/           ingest, report, revalidate, mpi:rebuild, terminology:load,
 │                      terminology:check, rules:build, demo:second-source, dev-db, test
-└── test/              128 tests + fixtures in the official release file formats
+└── test/              148 tests + fixtures in the official release file formats
 ```
 
 ## Limitations and next steps
@@ -554,7 +575,7 @@ fhir-integration-service/
 - **Auth to real EHRs**: the sandboxes are open. A production source would need SMART Backend Services (client-credentials JWT); this service's own API has only an optional shared key.
 - **Scale**: patient-level pulls page through FHIR search. Population-scale ingest should use Bulk Data `$export`.
 - **Units**: conversions are concept-scoped and explicit, not a general UCUM engine.
-- **Matching** is rule-based, with no Fellegi-Sunter weighting, and the review queue is an API, not a UI. Dismissals are not stored: `npm run mpi:rebuild` regenerates golden ids and raises candidates a steward had dismissed again, and refuses to run over manual links (every confirm creates them) unless given `--force`.
+- **Matching** is rule-based, with no Fellegi-Sunter weighting, and the review queue is an API, not a UI. `npm run mpi:rebuild` regenerates golden ids: it keeps dismissals (stored against source records) but loses overrides and confirmed merges, so it refuses to run over manual links (every confirm creates one) unless given `--force`.
 - **Cross-source reconciliation on real overlap** has not been exercised. SMART and HAPI share no patients, so it is demonstrated with a simulated second source.
 
 ---
