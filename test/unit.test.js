@@ -4,7 +4,7 @@ import { contentHash } from '../src/fhir/canonical.js';
 import { clinicalTime, dateRange } from '../src/fhir/dates.js';
 import { parseEtag } from '../src/fhir/present.js';
 import { patientRefOf } from '../src/fhir/references.js';
-import { describeGroup, groupEtag, groupMasters, parseGroupEtag, planConfirm } from '../src/mpi/groups.js';
+import { describeGroup, groupEtag, groupMasters, parseGroupEtag, planConfirm, planDismiss } from '../src/mpi/groups.js';
 import { demographicScore, differingIdentifiers, identifierPatterns, jaroWinkler, sharedIdentifiers, trustedIdentifiers } from '../src/mpi/match.js';
 import { survive } from '../src/mpi/survivorship.js';
 import { conceptsFor, exclusionsFor, getConcept } from '../src/terminology/concepts.js';
@@ -272,5 +272,39 @@ describe('duplicate groups', () => {
     const plan = planConfirm(members, ['a', 'b'], 'a');
     assert.deepEqual(plan.outsiderFlags.get('d').map((f) => f.masterId), ['a']);
     assert.deepEqual(plan.survivorFlags.map((f) => f.masterId), ['d']);
+  });
+
+  // The flags a plan leaves behind, applied to the members, so groups can be recomputed from them.
+  const applied = (members, plan) => members.map((m) => (plan.has(m.id) ? { ...m, possible_duplicates: plan.get(m.id).map((f) => (typeof f === 'string' ? flag(f) : f)) } : m));
+
+  test('dismissing a whole group clears every flag', () => {
+    const members = [master('a', 1, ['b', 'c']), master('b', 2, ['a', 'c']), master('c', 3, ['a', 'b'])];
+    const plan = planDismiss(members, ['a', 'b', 'c']);
+    assert.deepEqual([...plan.keys()].sort(), ['a', 'b', 'c']);
+    assert.ok([...plan.values()].every((flags) => flags.length === 0));
+    assert.deepEqual(groupMasters(applied(members, plan)), []);
+  });
+
+  test('dismissing some patients clears them and the flags that pointed at them, and spares everyone else', () => {
+    // d resembles a and c; b resembles a and c; nobody else is flagged against b.
+    const members = [master('a', 1, ['b', 'c', 'd']), master('b', 2, ['a', 'c']), master('c', 3, ['a', 'b', 'd']), master('d', 4, ['a', 'c'])];
+    const plan = planDismiss(members, ['d']);
+    assert.deepEqual([...plan.keys()].sort(), ['a', 'c', 'd']); // b was never flagged against d: untouched
+    assert.deepEqual([plan.get('a').map((f) => f.masterId), plan.get('c').map((f) => f.masterId), plan.get('d')], [['b', 'c'], ['a', 'b'], []]);
+    const [rest] = groupMasters(applied(members, plan));
+    assert.deepEqual([rest.members.map((m) => m.id), rest.complete], [['a', 'b', 'c'], true]); // without d the others are a clique
+  });
+
+  test('dismissing the patient that bridges two groups splits them', () => {
+    // a and b are one cluster, d and e another, and c is the only link between them.
+    const members = [master('a', 1, ['b', 'c']), master('b', 2, ['a', 'c']), master('c', 3, ['a', 'b', 'd', 'e']), master('d', 4, ['c', 'e']), master('e', 5, ['c', 'd'])];
+    assert.equal(groupMasters(members).length, 1);
+    const groups = groupMasters(applied(members, planDismiss(members, ['c'])));
+    assert.deepEqual(groups.map((g) => g.members.map((m) => m.id)), [['a', 'b'], ['d', 'e']]);
+  });
+
+  test('a dismissed patient loses flags that point outside the group too', () => {
+    const [a, b] = [master('a', 1, ['b', 'ghost']), master('b', 2, ['a'])];
+    assert.deepEqual(planDismiss([a, b], ['a']).get('a'), []);
   });
 });

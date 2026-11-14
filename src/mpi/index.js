@@ -17,7 +17,7 @@ import {
   sharedIdentifiers,
   trustedIdentifiers,
 } from './match.js';
-import { loadGroupOf, parseGroupEtag, planConfirm } from './groups.js';
+import { groupMasters, loadGroupOf, loadMembers, parseGroupEtag, planConfirm, planDismiss } from './groups.js';
 import { survive } from './survivorship.js';
 
 // Link decisions are serialized: two sources delivering the same new person at
@@ -307,6 +307,60 @@ async function moveOpenFlags(client, emptiedId, survivorId) {
 }
 
 /**
+ * Take the MPI lock and load the group `memberId` belongs to, refusing unless it is
+ * still exactly the view the steward read (`expectedToken` is that view's ETag).
+ */
+async function lockedGroup(client, memberId, expectedToken, verb) {
+  await client.query('SELECT pg_advisory_xact_lock($1)', [MPI_LOCK]);
+  const group = await loadGroupOf(client, memberId);
+  if (!group) throw notFound(`Patient ${memberId} is not in a group of possible duplicates (it may have just been confirmed or dismissed)`);
+  if (parseGroupEtag(group.etag) !== expectedToken) {
+    throw preconditionFailed(`The group changed since it was read: If-Match was W/"${expectedToken}" but it is now ${group.etag}. Read it again before ${verb}.`);
+  }
+  return group;
+}
+
+function setFlags(client, id, flags) {
+  return client.query('UPDATE master_patients SET possible_duplicates = $2::jsonb WHERE id = $1', [id, JSON.stringify(flags)]);
+}
+
+/**
+ * A steward decides that a group's patients are different people. `expectedToken` is
+ * the group's ETag, as for a confirm. By default the whole group is dismissed;
+ * `patients` narrows it to the ones that are different from everyone else in the
+ * group: they lose every flag, and the rest stay flagged among themselves. Nothing
+ * merges and no record moves. The groups that remain among the patients who were not
+ * dismissed come back with fresh ETags, so a steward can carry on (confirm what is
+ * left, say) without reading again.
+ */
+export async function dismissGroup(client, memberId, expectedToken, { patients = null } = {}) {
+  const group = await lockedGroup(client, memberId, expectedToken, 'dismissing');
+
+  const inGroup = new Set(group.members.map((m) => m.id));
+  const dismissed = patients === null ? [...inGroup] : [...new Set(patients)];
+  for (const id of dismissed) if (!inGroup.has(id)) throw badRequest(`Patient ${id} is not in this group`);
+  if (!dismissed.length) throw badRequest('Choose at least one patient to dismiss');
+  const dismissedSet = new Set(dismissed);
+
+  const changes = planDismiss(group.members, dismissed);
+  await client.query('SELECT id FROM master_patients WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[...inGroup]]);
+  for (const [id, flags] of changes) await setFlags(client, id, flags);
+
+  const stillNeedReview = []; // dismissed patients can still need review for other reasons, such as a conflict
+  for (const id of changes.keys()) {
+    const reason = dismissedSet.has(id)
+      ? `dismissed as different from the other patients in a group of ${inGroup.size}`
+      : `possible duplicates dismissed (${dismissed.length} of the ${inGroup.size} patients in its group)`;
+    const master = await recomputeGolden(client, id, reason, { always: true });
+    if (master.needs_review) stillNeedReview.push(id);
+  }
+
+  const rest = group.members.filter((m) => !dismissedSet.has(m.id)).map((m) => m.id);
+  const remaining = rest.length > 1 ? groupMasters(await loadMembers(client, rest)).sort((a, b) => b.records - a.records) : [];
+  return { dismissed, remaining, stillNeedReview };
+}
+
+/**
  * A steward confirms that a group of look-alike patients is one person. `expectedToken`
  * is the group's ETag from when they read it, so this only runs on that exact view:
  * a member edited, added or removed since then makes it a 412.
@@ -318,12 +372,7 @@ async function moveOpenFlags(client, emptiedId, survivorId) {
  * from (`matched_on.mergedFrom`), so `unlink` can still split one back out.
  */
 export async function confirmGroup(client, memberId, expectedToken, { patients = null, survivor = null } = {}) {
-  await client.query('SELECT pg_advisory_xact_lock($1)', [MPI_LOCK]);
-  const group = await loadGroupOf(client, memberId);
-  if (!group) throw notFound(`Patient ${memberId} is not in a group of possible duplicates (it may have just been confirmed or dismissed)`);
-  if (parseGroupEtag(group.etag) !== expectedToken) {
-    throw preconditionFailed(`The group changed since it was read: If-Match was W/"${expectedToken}" but it is now ${group.etag}. Read it again before confirming.`);
-  }
+  const group = await lockedGroup(client, memberId, expectedToken, 'confirming');
 
   const inGroup = new Set(group.members.map((m) => m.id));
   const selected = patients === null ? [...inGroup] : [...new Set(patients)];
@@ -341,9 +390,8 @@ export async function confirmGroup(client, memberId, expectedToken, { patients =
      WHERE master_id = ANY($2::uuid[])`,
     [survivorId, plan.mergedAway],
   );
-  const setFlags = (id, flags) => client.query('UPDATE master_patients SET possible_duplicates = $2::jsonb WHERE id = $1', [id, JSON.stringify(flags)]);
-  await setFlags(survivorId, plan.survivorFlags);
-  for (const [id, flags] of plan.outsiderFlags) await setFlags(id, flags);
+  await setFlags(client, survivorId, plan.survivorFlags);
+  for (const [id, flags] of plan.outsiderFlags) await setFlags(client, id, flags);
   await client.query(
     `UPDATE master_patients SET possible_duplicates = '[]', needs_review = false, merged_into = $2 WHERE id = ANY($1::uuid[])`,
     [plan.mergedAway, survivorId],

@@ -93,7 +93,7 @@ report produces per source, not an estimate. `GET /conformance` lists every sour
 
 - HAPI's Conditions use SNOMED CT through its OID (2.6%, normalized), WHO ICD-10 (1.2%), ICD-11 (0.2%) and an invented `chartr.example` system (7%). WHO ICD-10 codes such as `I10` are reported as `unsupported-system` and never read as ICD-10-CM. HAPI's few outright errors are Conditions whose `clinicalStatus` has the right code but no system (8) and Conditions with no `subject` (3).
 - HAPI's 1,013 Patient records resolve to 922 people, and none of them is linked to a SMART patient or even resembles one: no review candidate spans the two. The servers hold different populations, so reconciliation across sources is still demonstrated only with the simulated second source (`npm run demo:second-source`).
-- 127 HAPI patients (192 source records, in 21 groups of connected look-alikes) are in the steward queue, against 9 patients in 3 groups for SMART. For 121 of them the reason is look-alikes with no identifier in common: mostly one persona re-uploaded many times, each copy with an identifier of its own, so name and birthDate are all there is and the policy leaves them for a steward. The largest group is 74 records in 18 patients. A group is one call to confirm (see [Matching](#matching)); in a dry run that was rolled back, that group took 16 ms and all 24 groups took 85 ms. Two of the 24 are chains rather than cliques (one has 26 patients and not every pair resembles each other), which is why a group reports whether it is `complete` and a confirm can name a subset.
+- 127 HAPI patients (192 source records, in 21 groups of connected look-alikes) are in the steward queue, against 9 patients in 3 groups for SMART. For 121 of them the reason is look-alikes with no identifier in common: mostly one persona re-uploaded many times, each copy with an identifier of its own, so name and birthDate are all there is and the policy leaves them for a steward. The largest group is 74 records in 18 patients. A group is one call to confirm (see [Matching](#matching)); in a dry run that was rolled back, that group took 16 ms and all 24 groups took 85 ms. Two of the 24 are chains rather than cliques. In the one with 26 patients a single patient accounts for every missing pair, so dismissing that one patient leaves a complete group of 25 to confirm, which is why a group reports whether it is `complete` and both actions can name a subset. Dismissing all 24 groups in the same kind of dry run took 92 ms and changed no patient or record.
 
 These are snapshots. HAPI's numbers come from a smaller sample, and its Observations lean on one
 cohort: the 40 HbA1c patients supply 1,178 of the 4,033. The server is shared and everything on
@@ -198,7 +198,7 @@ npm run report -- --source smart
 npm test
 ```
 
-116 tests. They start a throwaway embedded Postgres on a free port (or use `TEST_DATABASE_URL`)
+128 tests. They start a throwaway embedded Postgres on a free port (or use `TEST_DATABASE_URL`)
 and a mock FHIR server that paginates with opaque `_getpages` cursors and injects 429/503s.
 
 ## API
@@ -222,6 +222,7 @@ Examples assume `http://localhost:5051`. When `API_KEY` is set, send `Authorizat
 | GET | `/patients/duplicate-groups?source=&limit=&offset=` | Groups of look-alike patients (connected by review flags), biggest first. Each has an `etag` and says whether every pair is flagged (`complete`). |
 | GET | `/patients/duplicate-groups/{id}` | One group; `id` can be any member. Returns the group's `ETag`. |
 | POST | `/patients/duplicate-groups/{id}/confirm` | Confirm a group as one person. `If-Match` is the group's ETag. Optional body: `{ "patients": [...], "survivor": "<id>" }`. |
+| POST | `/patients/duplicate-groups/{id}/dismiss` | Not the same people after all: dismisses the whole group, or only the patients named in `patients` (they lose every flag; the rest stay flagged among themselves). `If-Match` is the group's ETag. Returns the groups that remain, with fresh ETags. |
 
 An observation in the response:
 
@@ -460,6 +461,16 @@ where they came from (`matched_on.mergedFrom`), so `unlink` can still split one 
 a steward pinned on a merged-away patient are not carried over (they stay in its history); the
 response lists them as `overridesDropped`.
 
+Dismissing is the opposite decision. `POST /patients/duplicate-groups/{id}/dismiss` says the
+group's patients are different people: all of them, or only the ones named in `patients`, who
+lose every flag while the rest stay flagged among themselves. That is how a mixed group is
+worked: dismiss the odd one out, then confirm what is left. The response returns the groups
+that remain, each with a fresh ETag, so nothing has to be read again in between, and it lists
+any dismissed patient that still needs review for another reason (a conflict between its own
+records). Nothing merges and no record moves. A dismissed pair stays dismissed when a new
+look-alike arrives (only the newcomer is flagged), but dismissals are not stored:
+`npm run mpi:rebuild` raises them again.
+
 ### Survivorship
 
 The golden record is rebuilt from its linked source records whenever one changes. Records are
@@ -533,7 +544,7 @@ fhir-integration-service/
 │   └── middleware/    API key, errors
 ├── scripts/           ingest, report, revalidate, mpi:rebuild, terminology:load,
 │                      terminology:check, rules:build, demo:second-source, dev-db, test
-└── test/              116 tests + fixtures in the official release file formats
+└── test/              128 tests + fixtures in the official release file formats
 ```
 
 ## Limitations and next steps
@@ -543,7 +554,7 @@ fhir-integration-service/
 - **Auth to real EHRs**: the sandboxes are open. A production source would need SMART Backend Services (client-credentials JWT); this service's own API has only an optional shared key.
 - **Scale**: patient-level pulls page through FHIR search. Population-scale ingest should use Bulk Data `$export`.
 - **Units**: conversions are concept-scoped and explicit, not a general UCUM engine.
-- **Matching** is rule-based, with no Fellegi-Sunter weighting, and the review queue is an API, not a UI. A group can be confirmed in one call but not dismissed in one: a group of different people is dismissed patient by patient. `npm run mpi:rebuild` regenerates golden ids and raises candidates a steward had dismissed again, and refuses to run over manual links (every confirm creates them) unless given `--force`.
+- **Matching** is rule-based, with no Fellegi-Sunter weighting, and the review queue is an API, not a UI. Dismissals are not stored: `npm run mpi:rebuild` regenerates golden ids and raises candidates a steward had dismissed again, and refuses to run over manual links (every confirm creates them) unless given `--force`.
 - **Cross-source reconciliation on real overlap** has not been exercised. SMART and HAPI share no patients, so it is demonstrated with a simulated second source.
 
 ---

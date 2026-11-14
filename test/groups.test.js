@@ -34,6 +34,8 @@ const groups = async (query = '') => (await call(app.url, 'GET', `/patients/dupl
 const group = (id) => call(app.url, 'GET', `/patients/duplicate-groups/${id}`);
 const confirm = (id, etag, body) =>
   call(app.url, 'POST', `/patients/duplicate-groups/${id}/confirm`, { body, headers: etag === undefined ? {} : { 'If-Match': etag } });
+const dismiss = (id, etag, body) =>
+  call(app.url, 'POST', `/patients/duplicate-groups/${id}/dismiss`, { body, headers: etag === undefined ? {} : { 'If-Match': etag } });
 const patients = async () => (await call(app.url, 'GET', '/patients')).body.patients;
 
 /** Ana Rivera x2 and Ana Riviera, from three sources: every pair resembles each other. */
@@ -215,5 +217,109 @@ describe('confirming a group', () => {
     assert.equal(pinned.status, 200);
     const res = await confirm(a, (await group(a)).headers.get('etag')); // pinning changed s, so a fresh ETag
     assert.deepEqual(res.body.overridesDropped, [s]);
+  });
+});
+
+describe('dismissing a group', () => {
+  test('a whole group of different people loses every flag, and nothing merges', async () => {
+    const { a, s, h } = await threeLookAlikes();
+    const versionBefore = (await call(app.url, 'GET', `/patients/${s}`)).body.version;
+    const res = await dismiss(a, (await group(a)).headers.get('etag'));
+    assert.equal(res.status, 200);
+    assert.deepEqual([[...res.body.dismissed].sort(), res.body.remaining, res.body.stillNeedReview], [[a, s, h].sort(), [], []]);
+    assert.deepEqual((await patients()).map((p) => [p.records, p.needsReview, p.possibleDuplicates]), [[1, false, 0], [1, false, 0], [1, false, 0]]);
+    assert.deepEqual((await groups()).groups, []);
+    const after = (await call(app.url, 'GET', `/patients/${s}`)).body;
+    assert.ok(after.version > versionBefore); // its ETag moved, so a stale view of it is caught
+    const history = (await call(app.url, 'GET', `/patients/${s}/history`)).body.versions;
+    assert.match(history[0].reason, /^dismissed as different from the other patients in a group of 3/);
+  });
+
+  test('needs the ETag of the view that was read, and refuses a stale or malformed one', async () => {
+    const { a } = await threeLookAlikes();
+    const etag = (await group(a)).headers.get('etag');
+    assert.equal((await dismiss(a, undefined)).status, 428);
+    assert.equal((await dismiss(a, '"3"')).status, 400);
+    await push('smart', [anna('d1')]); // the group changes under the steward
+    const stale = await dismiss(a, etag);
+    assert.equal(stale.status, 412);
+    assert.match(stale.body.error, /Read it again before dismissing/);
+    assert.equal((await groups()).groups[0].size, 4); // nothing was dismissed
+  });
+
+  test('the odd one out can be dismissed, and what is left comes back ready to confirm', async () => {
+    const { a, s, h, d } = await fourWithAChain();
+    const res = await dismiss(a, (await group(a)).headers.get('etag'), { patients: [d] });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.dismissed, [d]);
+    assert.equal(res.body.remaining.length, 1);
+    const [left] = res.body.remaining;
+    assert.deepEqual([left.size, left.complete, left.patients.map((p) => p.id)], [3, true, [a, s, h]]); // without d, a clique
+    assert.equal((await call(app.url, 'GET', `/patients/${d}`)).body.possibleDuplicates.length, 0);
+
+    // The ETag in the response is current: the steward can confirm the rest without reading again.
+    const merged = await confirm(a, left.etag);
+    assert.equal(merged.status, 200);
+    assert.deepEqual([merged.body.records, (await patients()).length, (await groups()).total], [3, 2, 0]);
+  });
+
+  test('dismissing the patients that link the rest leaves nothing flagged', async () => {
+    const { a, s, h, d } = await fourWithAChain(); // s and d resemble a and h, but not each other
+    const res = await dismiss(a, (await group(a)).headers.get('etag'), { patients: [a, h] });
+    assert.deepEqual([[...res.body.dismissed].sort(), res.body.remaining], [[a, h].sort(), []]);
+    for (const id of [a, s, h, d]) assert.equal((await call(app.url, 'GET', `/patients/${id}`)).body.possibleDuplicates.length, 0);
+  });
+
+  test('a dismissal sticks when a new look-alike arrives', async () => {
+    const { a } = await threeLookAlikes();
+    await dismiss(a, (await group(a)).headers.get('etag'));
+    await push('smart', [rivera('x1')]); // resembles all three
+    const x = await masterOf('smart', 'x1');
+    const [g] = (await groups()).groups;
+    assert.deepEqual([g.size, g.complete], [4, false]); // the newcomer is flagged against each; the three are not re-flagged against each other
+    assert.deepEqual((await call(app.url, 'GET', `/patients/${a}`)).body.possibleDuplicates.map((p) => p.masterId), [x]);
+  });
+
+  test('validates the selection', async () => {
+    const { a } = await threeLookAlikes();
+    const etag = (await group(a)).headers.get('etag');
+    const stranger = '00000000-0000-4000-8000-000000000000';
+    for (const [body, pattern] of [
+      [{ patients: [a, stranger] }, /is not in this group/],
+      [{ patients: [] }, /at least one patient/],
+      [{ patients: 'a' }, /array of patient ids/],
+    ]) {
+      const res = await dismiss(a, etag, body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      assert.match(res.body.error, pattern);
+    }
+    assert.equal((await dismiss(stranger, etag)).status, 404);
+    assert.equal((await dismiss('not-a-uuid', etag)).status, 404);
+    assert.equal((await groups()).groups[0].size, 3); // nothing changed
+  });
+
+  test('two dismissals of the same group at once: one wins, the other finds nothing left', async () => {
+    const { a } = await threeLookAlikes();
+    const etag = (await group(a)).headers.get('etag');
+    const results = await Promise.all([dismiss(a, etag), dismiss(a, etag)]);
+    assert.deepEqual(results.map((r) => r.status).sort(), [200, 404]);
+    assert.deepEqual((await groups()).groups, []);
+  });
+
+  test('a dismissed patient can still need review for another reason', async () => {
+    await push('clinic-b', [patient('b1')]);
+    await push('smart', [patient('s1')]); // same SSN, name and birthDate: one person, two records
+    await push('clinic-b', [patient('b1', { birthDate: '1971-05-17', meta: { lastUpdated: '2025-07-01T00:00:00Z' } })]); // now their birthDates disagree
+    await push('hapi', [rivera('h1')]); // resembles the linked patient
+    const m = await masterOf('clinic-b', 'b1');
+    const h = await masterOf('hapi', 'h1');
+    const [g] = (await groups()).groups;
+    assert.deepEqual(g.patients.map((p) => p.id).sort(), [m, h].sort());
+
+    const res = await dismiss(m, g.etag);
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.stillNeedReview, [m]); // no longer flagged against h, but its own records still conflict
+    assert.deepEqual((await patients()).filter((p) => p.needsReview).map((p) => p.id), [m]);
+    assert.deepEqual((await groups()).groups, []);
   });
 });

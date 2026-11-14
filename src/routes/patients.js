@@ -7,7 +7,7 @@ import pool, { withTransaction } from '../db/pool.js';
 import { badRequest, notFound, preconditionRequired } from '../errors.js';
 import { etag, parseEtag, presentGolden } from '../fhir/present.js';
 import { describeGroup, loadGroupOf, loadGroups, parseGroupEtag } from '../mpi/groups.js';
-import { confirmGroup, dismissPossibleDuplicates, linkRecord, setOverrides, unlinkRecord } from '../mpi/index.js';
+import { confirmGroup, dismissGroup, dismissPossibleDuplicates, linkRecord, setOverrides, unlinkRecord } from '../mpi/index.js';
 import { everything } from '../mpi/everything.js';
 import { findConditions } from '../query/conditions.js';
 import { loadPatient, patientSummary } from '../query/linked.js';
@@ -94,6 +94,18 @@ router.post('/duplicate-groups/:id/confirm', async (req, res) => {
     conflicts: master.conflicts,
     golden: presentGolden(master),
   });
+});
+
+// The opposite decision: these are different people. Body, optional: { patients: [ids] }
+// dismisses only those from the group (the rest stay flagged among themselves); with no
+// body the whole group is dismissed. Nothing merges. The groups that remain come back
+// with fresh ETags.
+router.post('/duplicate-groups/:id/dismiss', async (req, res) => {
+  const token = requireGroupIfMatch(req);
+  const { patients = null } = req.body ?? {};
+  if (patients !== null && (!Array.isArray(patients) || patients.some((p) => typeof p !== 'string'))) throw badRequest('patients must be an array of patient ids');
+  const result = await withTransaction((client) => dismissGroup(client, req.params.id, token, { patients }));
+  res.json({ dismissed: result.dismissed, remaining: result.remaining.map(describeGroup), stillNeedReview: result.stillNeedReview });
 });
 
 router.get('/:id', async (req, res) => {
@@ -227,7 +239,7 @@ router.post('/:id/dismiss-duplicates', async (req, res) => {
 
 function requireGroupIfMatch(req) {
   const header = req.get('if-match');
-  if (header === undefined) throw preconditionRequired(`Confirming a group requires If-Match with the group's ETag (GET /patients/duplicate-groups/${req.params.id})`);
+  if (header === undefined) throw preconditionRequired(`Changing a group requires If-Match with the group's ETag (GET /patients/duplicate-groups/${req.params.id})`);
   const token = parseGroupEtag(header);
   if (token === null) throw badRequest(`If-Match '${header}' is not a group ETag like W/"g-0123456789abcdef"`);
   return token;

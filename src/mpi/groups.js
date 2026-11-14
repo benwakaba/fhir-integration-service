@@ -116,6 +116,24 @@ export function planConfirm(members, selectedIds, survivorId) {
   };
 }
 
+/**
+ * What dismissing `dismissedIds` does to the review flags: the dismissed patients
+ * are different people from everyone else in the group, so they lose every flag,
+ * and anyone who was flagged against them loses that flag. Only patients whose
+ * flags change are in the result (id -> their new flags); everyone else is
+ * untouched and keeps their version.
+ */
+export function planDismiss(members, dismissedIds) {
+  const dismissed = new Set(dismissedIds);
+  const changes = new Map();
+  for (const m of members) {
+    const flags = flagsOf(m);
+    const kept = dismissed.has(m.id) ? [] : flags.filter((d) => !dismissed.has(d.masterId));
+    if (kept.length !== flags.length) changes.set(m.id, kept);
+  }
+  return changes;
+}
+
 function memberSummary(m) {
   const name = m.golden?.name?.[0];
   return {
@@ -156,6 +174,12 @@ export function describeGroup(group) {
     reasons: [...reasons].map(([reason, pairs]) => ({ reason, pairs })).sort((a, b) => b.pairs - a.pairs),
     patients: group.members.map(memberSummary),
   };
+}
+
+/** The golden patients with these ids, in the shape groups are built from (merged-away ones excluded). */
+export async function loadMembers(db, ids) {
+  const { rows } = await db.query(`${MEMBER_QUERY} WHERE m.id = ANY($1::uuid[]) AND m.merged_into IS NULL`, [ids]);
+  return rows;
 }
 
 /** Every group, biggest (most source records) first. */

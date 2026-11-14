@@ -12,7 +12,7 @@ internal concepts, and serves one reconciled patient across sources:
 GET /patients/{id}/observations?concept=hba1c&since=2024-01-01
 ```
 
-**Status: working.** `npm test` passes 116 tests against a real Postgres. It has run against
+**Status: working.** `npm test` passes 128 tests against a real Postgres. It has run against
 the SMART Health IT sandbox (27,215 resources) and the HAPI public server (6,104 resources),
 with LOINC 2.83 and ICD-10-CM FY2026 loaded.
 Do not rebuild what is here; extend it.
@@ -114,6 +114,9 @@ is a 412. A merged-away patient keeps its id as a tombstone (`merged_into`, `act
 `replaced-by` link), developer-API reads of it redirect to the survivor, and steward actions on
 it are refused. Records move as manual links with `matched_on.mergedFrom`, so `unlink` can undo
 one. `planConfirm` rewires review flags for a subset confirm and is pure; keep it that way.
+Dismissing a group (or named patients out of it) is the opposite decision behind the same
+ETag guard (`lockedGroup`): it clears flags, merges nothing, and returns the groups that
+remain with fresh ETags. Dismissals are not stored.
 
 **Source records are mirrors; stewardship happens on the golden record.** A source's next
 version supersedes an edit made here. Overrides, links and dismissals belong to golden records.
@@ -162,15 +165,14 @@ Tradeoffs, not oversights. Keep them documented rather than quietly half-fixing 
 - No SMART Backend Services auth toward sources; this API has only an optional shared key.
 - Pull ingest pages through FHIR search; there is no Bulk Data `$export` path.
 - Matching is rule-based with no probabilistic weighting, and the review queue is an API, not a UI.
-  A group can be confirmed in one call but not dismissed in one.
 - Unit conversion is per concept, not a general UCUM engine.
 
 ## Where to take it next
 
 Roughly in order of value:
 
-1. **A group-level dismiss, and a review UI.** A group is confirmed in one call but dismissed
-   only patient by patient, and the queue is an API.
+1. **A review UI, and remembered dismissals.** The queue and its group actions are an API
+   only, and a dismissal is not stored, so `npm run mpi:rebuild` raises it again.
 2. **A source with real patient overlap.** SMART and HAPI share no patients, so cross-source
    reconciliation has only been exercised on the simulated second source.
 3. **Work the terminology backlog.** Six basic-metabolic-panel analytes lead SMART's unmapped
